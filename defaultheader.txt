@@ -1,0 +1,3 @@
+## Permissions: See the  xinv  license file https://raw.githubusercontent.com/strawpants/xinv/master/LICENSE
+## Copyright (c) 2022 Roelof Rietbroek, rietbroek@utwente.nl
+
