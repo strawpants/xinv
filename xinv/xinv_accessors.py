@@ -3,6 +3,7 @@
 
 import xarray as xr
 
+import scipy.linalg.blas as blas
 
 @xr.register_dataset_accessor("xinv")
 class InverseAccessor:
@@ -10,18 +11,27 @@ class InverseAccessor:
         self._obj = xarray_obj
     
     @staticmethod
-    def buildneq(fwd,obs=None,cov=None):
+    def buildneq(fwd,obs=None,cov=None,apriori=None):
         """Builds a normal equation system from forward operators, data and an accompanying covariance"""
-        
-        if cov is not None:
+        # if cov is not None:
             #weighted, apply a decorrelation to the observations and forward operator
-            fwd=cov.decorrelate(fwd.jacobian))
-            obs=cov.decorrelate(obs)
+            # fwd=cov.decorrelate(fwd.jacobian))
+            # obs=cov.decorrelate(obs)
         
-        #create a normal matrix and right hand side vector
-        AtA,Atb,ltpl=fwd.build(obs)
+        # #create a normal matrix and right hand side vector
+        A=fwd.jacobian()
+        unkcoord=fwd.unknown_coord()
+        dsneq=xr.Dataset(coords={unkcoord.name:unkcoord.values})
+        if obs is not None:
+            dsneq['Atb']=xr.dot(A.T,obs)
+        
+        # add the symemtric matrix (adds a new dimension without a coord (as it it the same as the unkcoord)
+        dsneq['AtA']=([unkcoord.name,unkcoord.name+"_t"],blas.dsyrk(1.0,A.values,trans=1))
+        
+        dsneq['ltpl']=xr.dot(obs.T,obs)
+        return dsneq
    
-   def solve(self):
+    def solve(self):
        """Solve the current normal equation system"""
 
        pass

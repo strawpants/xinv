@@ -6,31 +6,33 @@ import numpy as np
 
 class Polynomial:
     linear=True
-    def __init__(self,n,outcoord=None):
+    def __init__(self,n,x):
         """Setup a forward operator which represents a polynomial of degree n"""
         self._n=n
+        self.ycoord="x"
         degs=[i for i in range(self._n+1)]
-        self.incoord= xr.DataArray(degs,coords={"poly":degs},name='poly',dims='poly')
-    
-    def decorrelate(self,cov):
-        pass
+        
+
+        self._ds= xr.Dataset(coords={"poly":degs,"x":x})
+
 
     def jacobian(self):
-        pass
+        """Creates the Jacobian of the forward operator (note:linear operator)"""
+        if 'jacobian' not in self._ds:
+            self._ds['jacobian']=(["x","poly"],np.zeros([self._ds.dims['x'],self._ds.dims['poly']]))
+             
+            xdim=self._ds.dims['x']
+            pdim=self._ds.dims['poly']
+            tmp=np.power(np.repeat(self._ds.x.values,pdim).reshape(xdim,pdim),self._ds.poly.values)
+            self._ds['jacobian']=(["x","poly"],tmp)
+        return self._ds.jacobian
 
-    def __call__(self,inpara,x):
-        """implementation of the forward operator"""
-        # todo: this could/should be optimized with cython
-        out=[]
-        degar=np.array([i for i in range(self._n+1)])
-        for xelem in x:
-            polycoef=np.power([xelem]*(self._n+1),degar)   
-            out.append(polycoef@inpara)
-        
-        return xr.DataArray(out,coords={"x":x},name="poly_eval")
+    def __call__(self,inpara):
+        """Apply the forward operator"""
+        if type(inpara) is not xr.DataArray:
+            inpara=xr.DataArray(inpara,dims=("poly"))
+        out=self.jacobian()@inpara
+        return xr.DataArray(out,coords={"x":self._ds.x},name="poly_eval")
 
-
-    # @property
-    # def xcoord(self):
-        # """return the coordinate of the x (unknown parameter) dimension"""
-        # return xr.DataArray([i for i in range(self._n+1)],name='poly',dims='poly')
+    def unknown_coord(self):
+        return self._ds.poly 

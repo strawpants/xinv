@@ -17,7 +17,7 @@ class BuildNeqTest(unittest.TestCase):
         #initialize the forward operator
         polyfwd=Polynomial(n=2,x=xaxis)
         
-        #create polynomial coefficients
+        #create polynomial coefficients to test
         coef=[1.5,3,0.5]
         
 
@@ -26,12 +26,13 @@ class BuildNeqTest(unittest.TestCase):
         #make some noise!!
         simobs+=np.random.normal(0,0.05,simobs.shape)
         
+       
         # build a normal equation system
-        neq=xr.Dataset.xinv.buildneq(polyfwd,simobs)
-
+        dsneq=xr.Dataset.xinv.buildneq(polyfwd,simobs)
+        import pdb;pdb.set_trace()
 
         #solve the normal equation system
-        neq.xinv.solve()
+        dsneq.xinv.solve()
         
         #compare the estimated with the prescribed parameters
 
