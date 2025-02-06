@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0","setuptools-scm>=8","packaging"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "xinv"
+dynamic = ["version"]
+#version = "0.0.1"
+authors = [
+  { name="Roelof Rietbroek", email="r.rietbroek@utwente.nl" },
+]
+description = "Xarray accessors for manipulating and working with inverse problems"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Development Status :: 1 - Planning"
+]
+dependencies = [ "scipy", "xarray >= 2023.1.0", "numpy","numba", "sparse"]
+
+[project.optional-dependencies]
+#you need dask in combination with when using older xarray versions
+dask=["dask>=2022.9.2"]
+
+[tool.setuptools_scm]
+version_file = "src/xinv/_version.py"
+
+[project.entry-points."xarray.backends"]
+#icgem = "shxarray.io.shiobackend:ICGEMBackEntryPoint"
+
+
+[project.urls]
+"Homepage" = "https://github.com/strawpants/xinv"
+"Bug Tracker" = "https://github.com/strawpants/xinv/issues"
+
