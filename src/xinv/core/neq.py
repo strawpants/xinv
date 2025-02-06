@@ -7,7 +7,7 @@ from scipy.linalg.blas import dtrsm
 from scipy.linalg.lapack import dpotri
 from xinv.core.attrs import cov_attrs,solest_attrs,ltpl_attrs,find_neq_components,sigma0_attrs,Chol_attrs
 import numpy as np
-
+import xarray as xr
 def solve(dsneq,inplace=False):
     """Solve the normal equation system using Cholesky factorization"""
     
@@ -76,21 +76,23 @@ def solve(dsneq,inplace=False):
         return dsneq
 
     
-def reduce(dsneq, idx):
+def reduce(dsneq:xr.Dataset, idx):
     #tbd reduce (implicitly solve) variables from a normal equation system spanned by idx
     raise NotImplementedError("Reduce operation not yet implemented")
 
+def fix(dsneq:xr.Dataset, idx):
+    #tbd fix and (remove) solve) variables from a normal equation system spanned by idx
+    raise NotImplementedError("Fix operation not yet implemented")
 
-# def fix(self,variables=None):
-    # """Fix the indicated variables to its a apriori values"""
-    # return self._obj
-
-# def set_apriori(self,da):
-    # """Change the a priori values of the system"""
-    # return self._obj
+def set_apriori(dsneq:xr.Dataset, daapri:xr.DataArray):
+    #tbd set/change apriori values in a normal equation system
+    raise NotImplementedError("Set apriori values not yet implemented")
 
 
-# def add(self,other):
-    # """Add one normal equation system to another. Common parameters will be added, the system will be extended with unique parameters of the other system"""
-    # return self._obj
+def add(dsneq:xr.Dataset, dsneqother:xr.Dataset):
+    #tbd add/merge two normal equation systems
+    raise NotImplementedError("Adding/merging NEQS not yet implemented")
 
+def transform(dsneq:xr.Dataset, fwdoperator):
+    #tbd transform normal equation system using a forward transformation matrix
+    raise NotImplementedError("Transforming NEQS not yet implemented")
