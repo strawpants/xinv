@@ -42,26 +42,53 @@ def solve(dsneq,inplace=False):
     #Solve the system in several steps
     #1. triangular solve U'z=rhs for z (U' is now the Cholesky factor of N)
     #dtrsm(alpha, a, b[, side, lower, trans_a, diag, overwrite_b]) 
-    transa=1
-    side=0 #0 means left
-    dtrsm(1.0,N.data,rhs.data,side=side,lower=lower,trans_a=transa,overwrite_b=1)
+    #breakpoint()
+    
+    if rhs.data.flags['F_CONTIGUOUS'] and rhs.data.strides[0] ==8:
+        rhs_is_c_cont=1
+    elif rhs.data.flags['C_CONTIGUOUS'] and rhs.data.strides[1] == 8:
+        rhs_is_c_cont=0
+    else:
+        raise RuntimeError("Right hand side matrix is not C or F contiguous")
 
+    
+    if rhs_is_c_cont:
+        transa=1
+        side=0 #0 means left
+    
+        dtrsm(1.0,N.data,rhs.data,side=side,lower=lowapparent,trans_a=transa,overwrite_b=1)
+    else:
+        #rhs is F contigious
+        transa=0
+        side=1 #0 means left  
+        dtrsm(1.0,N.data,rhs.data.T,side=side,lower=lowapparent,trans_a=transa,overwrite_b=1)
+
+        
     #2. update ltpl
+    
     ltpl-=rhs.dot(rhs,dim=N.dims[0])
     ltpl.attrs.update(ltpl_attrs('posteriori'))
 
     #3 solve Ux=z for x
+    
+    
     #call dtrsv('U','N','N',n1,C,n1,d,1) !d is updated again
-    transa=0
-    side=0 #0 means left
-    dtrsm(1.0,N.data,rhs.data,side=side,lower=lower,trans_a=transa,overwrite_b=1)
+    if rhs_is_c_cont:
+        transa=0
+        side=0 #0 means left
+        dtrsm(1.0,N.data,rhs.data,side=side,lower=lowapparent,trans_a=transa,overwrite_b=1)
+    else:
+        transa=1
+        side=1 #0 means left
+        dtrsm(1.0,N.data,rhs.data.T,side=side,lower=lowapparent,trans_a=transa,overwrite_b=1)
+    
     # dtrsv(N.data,rhs.data,lower=0,trans=0,overwrite_x=1)
     rhs.attrs.update(solest_attrs())
 
 
     #4 compute error-covariance 
     # call dpotri('U',n1,C,n1,info)
-    dpotri(N.data,lower=lower,overwrite_c=1)
+    dpotri(N.data,lower=lowapparent,overwrite_c=1)
     N.attrs.update(cov_attrs()) 
 
     # compute posteriori sigma0
