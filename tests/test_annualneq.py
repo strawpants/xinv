@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 ## Permissions: See the  xinv  license file https://raw.githubusercontent.com/strawpants/xinv/master/LICENSE
-## Copyright (c) 2022 Roelof Rietbroek, rietbroek@utwente.nl
+## Copyright (c) 2022 Roelof Rietbroek, rietbroek@utwente.nl, 2025 Kiana Karimi, s.karimi@utwente.nl
 
 import pytest
 import xarray as xr
@@ -16,9 +16,16 @@ def noisyharmonics(request):
     naux=10 # number of auxiliary datasets
     noise_std=0.01
     trend_slope= 0 
-    x_axis = np.arange(-10,10, 0.05)
-    T = 10
+    T = 1
     order=request.param[0]
+    
+    #x_axis = np.arange(-10,10, 0.05)
+    t0_date = np.datetime64('2002-01-01')
+    T_yearly = np.timedelta64(365, 'D') + np.timedelta64(6, 'h')  
+    random_dates = t0_date + np.arange(0, 365 * 22, 30).astype('timedelta64[D]')
+    x_axis = (random_dates - t0_date) / T_yearly
+    
+    
     hstrue=np.zeros([naux,nannual])
     hsobs = np.zeros([naux,len(x_axis)],order=order)
     
@@ -62,7 +69,7 @@ def test_noisyharmonics(noisyharmonics):
    # npoly=noisypoly.sizes['poly']-1  check later
     #initialize the forward operator
     nharmonics = 2  
-    harmonic_fwd = annual(n=nharmonics,harmonic_x='x',cache=True)
+    harmonic_fwd = annual(n=nharmonics,annual_x='x',cache=True)
 
     # Build the normal equation system
     std_noise = 0.01
