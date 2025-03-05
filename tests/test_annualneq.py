@@ -22,7 +22,7 @@ def noisyharmonics(request):
     #x_axis = np.arange(-10,10, 0.05)
     t0_date = np.datetime64('2002-01-01')
     T_yearly = np.timedelta64(365, 'D') + np.timedelta64(6, 'h')  
-    random_dates = t0_date + np.arange(0, 365 * 22, 30).astype('timedelta64[D]')
+    random_dates = t0_date + np.arange(0, 365 * 22, 0.05).astype('timedelta64[D]')
     x_axis = (random_dates - t0_date) / T_yearly
     
     
