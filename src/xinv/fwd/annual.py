@@ -11,6 +11,7 @@ class annual(FwdOpbase):
         super().__init__(obs_dim = annual_x, unknown_dim="annual", cache=cache)
         self._n = n
         
+        ## add semiannual attribute here
     
     def _jacobian_impl(self,dain):
         """Creates the Jacobian of the forward operator (note:linear operator)"""
@@ -18,7 +19,7 @@ class annual(FwdOpbase):
         order = 'C'
         jacobian=xr.DataArray(np.zeros([len(xcoords),self._n], order =order), dims=[self._obsdim,self._unkdim], name = "annual_jacobian",coords={self._obsdim:xcoords,self._unkdim:np.arange(self._n)})
 
-        omega_annual = (2*np.pi)/ (xcoords)
+        omega_annual = (2*np.pi)* (xcoords)
         
         if self._n>0:            
             jacobian.loc[:,0]= np.cos(omega_annual)
