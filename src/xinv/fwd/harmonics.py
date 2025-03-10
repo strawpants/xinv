@@ -17,7 +17,7 @@ class Harmonics(FwdOpbase):
         #elif semi_annual==True:
         else:
             super().__init__(obs_dim=annual_x, unknown_dim="annual_semi", cache=cache)
-            self._n=n+1  # Number of annual + semiannual harmonics
+            self._n=n  # Number of annual + semiannual harmonics
         
         self._semi_annual=semi_annual
 
@@ -29,18 +29,17 @@ class Harmonics(FwdOpbase):
         
 
         omega_annual =(2*np.pi)*xcoords # angular frequency
-        #phase_shift=np.arctan2(np.sin(omega_annual),np.cos(omega_annual))
-        phase_shift = np.pi / 4 
+        phase_shift=0
         
         index=0            
         jacobian.loc[:,index]=np.cos(omega_annual+phase_shift)
         
-        index+=1
+        #index+=1
 
         if self._semi_annual:
             omega_semiannual = (4*np.pi)*xcoords 
-            #phase_semi=np.arctan2(np.sin(omega_semiannual),np.cos(omega_semiannual))
-            phase_semi = np.pi / 4 
+            #phase_semi=np.arctan2(B,A)
+            phase_semi=0
             jacobian.loc[:,index]=np.cos(omega_semiannual+phase_semi)
 
 
