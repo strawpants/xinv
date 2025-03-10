@@ -19,11 +19,14 @@ def noisyharmonics(request):
     trend_slope= 0 
     order=request.param[0]
     
-    #x_axis = np.arange(-10,10, 0.05)
     t0_date = np.datetime64('2012-01-01')
     T_yearly = np.timedelta64(365, 'D') + np.timedelta64(6, 'h')
     random_dates = t0_date + np.arange(0, 365 * 22, 0.05).astype('timedelta64[D]')
-    x_axis = (random_dates - t0_date) / T_yearly
+   # x_axis = (random_dates - t0_date) / T_yearly
+    T_semiannual=T_yearly/2
+    
+    x_axis=(random_dates - t0_date)/T_semiannual #x_axis_semiannual 
+
     
     
     hstrue=np.zeros([naux,nannual])
@@ -31,18 +34,20 @@ def noisyharmonics(request):
     
     for i in range(naux):
         scale =  (i/naux)*np.pi
-        omega = (2*np.pi)
-        coss= (3*scale)*np.cos(omega*x_axis)
-        sinn= (-5*scale)*np.sin(omega*x_axis)
+        omega = (4*np.pi)
+
+        A = np.sqrt((3*scale)**2 + (-5*scale)**2) # amplitude
+        phase_shift = 0
+        #np.arctan2(-5*scale, 3*scale)
  
         if i<6:
             trend = -(i+1)*trend_slope*x_axis
-            hsobs[i,:]= trend + sinn + coss
+            hsobs[i,:]= trend + A*np.cos(omega*x_axis + phase_shift)
             hstrue[i,0]= np.sqrt((3*scale)**2 + (-5*scale)**2)
             
         if i>=6:
             trend = (i+1)*trend_slope*x_axis
-            hsobs[i,:]= trend + sinn + coss  
+            hsobs[i,:]= trend + A*np.cos(omega*x_axis + phase_shift)
             hstrue[i,0]= np.sqrt((3*scale)**2 + (-5*scale)**2)
    
                 
@@ -63,7 +68,7 @@ def test_noisyharmonics(noisyharmonics):
     """
 
     nharmonics = 1 
-    harmonic_fwd = Harmonics(n=nharmonics, semi_annual=False, annual_x='x', cache=True)
+    harmonic_fwd = Harmonics(n=nharmonics, semi_annual=True, annual_x='x', cache=True)
 
     std_noise = 0.01
     dsneq = noisyharmonics.hsobs.xi.build_normal(harmonic_fwd, ecov=std_noise * std_noise)  
