@@ -6,6 +6,8 @@ from scipy.linalg import cholesky
 from scipy.linalg.blas import dtrsm
 from scipy.linalg.lapack import dpotri
 from xinv.core.attrs import cov_attrs,solest_attrs,ltpl_attrs,find_neq_components,sigma0_attrs,Chol_attrs
+from xinv.core.exceptions import XinvIllposedError
+
 import numpy as np
 import xarray as xr
 def solve(dsneq,inplace=False):
@@ -35,8 +37,10 @@ def solve(dsneq,inplace=False):
         lowapparent=1-lower
     else:
         raise RuntimeError("Normal matrix is not C or F contiguous")
-
-    cholesky(N.data,lower=lowapparent,overwrite_a=1)
+    try:
+        cholesky(N.data,lower=lowapparent,overwrite_a=1)
+    except np.linalg.LinAlgError as e:
+        raise XinvIllposedError(str(e))
     N.attrs.update(Chol_attrs(lower))
     
     #Solve the system in several steps
@@ -123,3 +127,6 @@ def add(dsneq:xr.Dataset, dsneqother:xr.Dataset):
 def transform(dsneq:xr.Dataset, fwdoperator):
     #tbd transform normal equation system using a forward transformation matrix
     raise NotImplementedError("Transforming NEQS not yet implemented")
+
+
+
