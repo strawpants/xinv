@@ -33,7 +33,7 @@ class Harmonics(FwdOpbase):
             
         return jacobian
     
-class annual_harmonic(Harmonics):
+class Annual_harmonic(Harmonics):
     def __init__(self,x0,obs_dim="time", delta_x=np.timedelta64(365,'D')+ np.timedelta64(int(86400/4), 's')):
     
         super().__init__(freqs= 2*np.pi,unknown_dim="harmonic_annual",obs_dim=obs_dim,delta_x=delta_x)
