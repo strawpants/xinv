@@ -22,9 +22,7 @@ class Harmonics(FwdOpbase):
         jacobian=xr.DataArray(np.zeros([len(xcoords),self._n], order=order), dims=[self._obsdim,self._unkdim], name="harmonic_jacobian", coords={self._obsdim:xcoords,self._unkdim:np.arange(self._n)})
         
         if self._x0 is None:
-            self._x0=xcoords.mean().item()
-            
-        
+            self._x0=xcoords.mean().item()          
             
         for i, freq in enumerate(self._freqs):
             omega_t=freq*(((xcoords-self._x0)/self._delta_x).astype(np.float64))
@@ -33,14 +31,13 @@ class Harmonics(FwdOpbase):
             
         return jacobian
     
-class Annual_harmonic(Harmonics):
-    def __init__(self,x0,obs_dim="time", delta_x=np.timedelta64(365,'D')+ np.timedelta64(int(86400/4), 's')):
-    
-        super().__init__(freqs= 2*np.pi,unknown_dim="harmonic_annual",obs_dim=obs_dim,delta_x=delta_x)
+class SeasonalHarmonics(Harmonics):
+    def __init__(self,x0,semi_annual=True,obs_dim="time",delta_x=np.timedelta64(365,'D')+np.timedelta64(int(86400/4),'s')):
         
-        
-class Semiannual_harmonic(Harmonics):
-    def __init__(self,x0,obs_dim="time",delta_x= np.timedelta64(365, 'D') + np.timedelta64(int(86400/4), 's')):
-        
-        super().__init__(frequency = 4*np.pi,unknown_dim="harmonic_semiannual",obs_dim=obs_dim,delta_x=delta_x)
+        freqs=[2*np.pi]
+        if semi_annual is True:
+            freqs.append(4*np.pi)
+            
+        super().__init__(freqs=freqs,unknown_dim="harmonics_seasonal",obs_dim=obs_dim,delta_x=delta_x)
+
         
