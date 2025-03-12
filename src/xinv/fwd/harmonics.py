@@ -22,7 +22,7 @@ class Harmonics(FwdOpbase):
         jacobian=xr.DataArray(np.zeros([len(xcoords),self._n], order=order), dims=[self._obsdim,self._unkdim], name="harmonic_jacobian", coords={self._obsdim:xcoords,self._unkdim:np.arange(self._n)})
         
         if self._x0 is None:
-            self._x0=xcoords.mean().item()          
+            self._x0=xcoords.mean().values          
             
         for i, freq in enumerate(self._freqs):
             omega_t=freq*(((xcoords-self._x0)/self._delta_x).astype(np.float64))
@@ -38,6 +38,6 @@ class SeasonalHarmonics(Harmonics):
         if semi_annual is True:
             freqs.append(4*np.pi)
             
-        super().__init__(freqs=freqs,unknown_dim="harmonics_seasonal",obs_dim=obs_dim,delta_x=delta_x)
+        super().__init__(freqs=freqs,unknown_dim="harmonics_seasonal",obs_dim=obs_dim,delta_x=delta_x,x0=x0)
 
         

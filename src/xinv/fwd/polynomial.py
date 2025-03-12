@@ -24,7 +24,6 @@ class Polynomial(FwdOpbase):
 
         order='C'
         jacobian=xr.DataArray(np.zeros([len(xcoords),self._n+1],order=order),dims=[self._obsdim,self._unkdim],name="poly_jacobian",coords={self._obsdim:xcoords,self._unkdim:self._unkcoord})
-        
         xcoords_rel=((xcoords-self._x0)/self._delta_x).data
         #fill polynomial scales
         for i in range(self._n+1):
