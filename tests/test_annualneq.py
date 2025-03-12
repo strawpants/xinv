@@ -6,7 +6,7 @@ import pytest
 import xarray as xr
 import numpy as np
 from xinv import *
-from xinv.fwd.annual import annual
+from xinv.fwd.annual import Annual
 
 @pytest.fixture(params=['C','F'])
 def noisyharmonics(request):
@@ -66,7 +66,7 @@ def test_noisyharmonics(noisyharmonics):
 
     #initialize the forward operator
     nharmonics = 2  
-    harmonic_fwd = annual(n=nharmonics,annual_x='x',cache=True)
+    harmonic_fwd = Annual(n=nharmonics,annual_x='x',cache=True)
 
     # Build the normal equation system
     std_noise = 0.01

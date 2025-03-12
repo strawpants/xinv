@@ -6,41 +6,41 @@ import xarray as xr
 from xinv.fwd import FwdOpbase
 
 class Harmonics(FwdOpbase):
-    def __init__(self, n, semi_annual= False, annual_x='x', cache=False):
+    def __init__(self,freqs,obs_dim="time",unknown_dim="harmonic",x0=None,delta_x=1):
+        """ Setup a forward operator to represent multiple harmonic cosine and sine components."""
         
-        """Setup a forward operator that represents annual and semi-annual terms of a signal"""
+        super().__init__(obs_dim=obs_dim, unknown_dim=unknown_dim)
+        self._freqs=freqs
+        self._x0=x0
+        self._delta_x=delta_x
+        self._n=2*len(self._freqs)
         
-        if not semi_annual:
-            super().__init__(obs_dim=annual_x, unknown_dim="annual", cache=cache)
-            self._n=n
+    def _jacobian_impl(self,dain):
+        """ Creates the Jacobian of the forward operator (note: linear operator)."""
+        xcoords=dain.coords[self._obsdim]
+        order='C'
+        jacobian=xr.DataArray(np.zeros([len(xcoords),self._n], order=order), dims=[self._obsdim,self._unkdim], name="harmonic_jacobian", coords={self._obsdim:xcoords,self._unkdim:np.arange(self._n)})
         
-        #elif semi_annual==True:
-        else:
-            super().__init__(obs_dim=annual_x, unknown_dim="annual_semi", cache=cache)
-            self._n=n  # Number of annual + semiannual harmonics
+        if self._x0 is None:
+            self._x0=xcoords.mean().item()
+            
         
-        self._semi_annual=semi_annual
-
-    def _jacobian_impl(self, dain):
-        """Creates the Jacobian of the forward operator (linear operator)"""
-        xcoords = dain.coords[self._obsdim]
-        order = 'C'
-        jacobian=xr.DataArray(np.zeros([len(xcoords),self._n], order =order), dims=[self._obsdim,self._unkdim], name = "annual_jacobian",coords={self._obsdim:xcoords,self._unkdim:np.arange(self._n)})
-        
-
-        omega_annual =(2*np.pi)*xcoords # angular frequency
-        phase_shift=0
-        
-        index=0            
-        jacobian.loc[:,index]=np.cos(omega_annual+phase_shift)
-        
-        #index+=1
-
-        if self._semi_annual:
-            omega_semiannual = (4*np.pi)*xcoords 
-            #phase_semi=np.arctan2(B,A)
-            phase_semi=0
-            jacobian.loc[:,index]=np.cos(omega_semiannual+phase_semi)
-
-
+            
+        for i, freq in enumerate(self._freqs):
+            omega_t=freq*(((xcoords-self._x0)/self._delta_x).astype(np.float64))
+            jacobian.loc[:,2*i]=np.cos(omega_t)
+            jacobian.loc[:,2*i+1]=np.sin(omega_t)
+            
         return jacobian
+    
+class annual_harmonic(Harmonics):
+    def __init__(self,x0,obs_dim="time", delta_x=np.timedelta64(365,'D')+ np.timedelta64(int(86400/4), 's')):
+    
+        super().__init__(freqs= 2*np.pi,unknown_dim="harmonic_annual",obs_dim=obs_dim,delta_x=delta_x)
+        
+        
+class Semiannual_harmonic(Harmonics):
+    def __init__(self,x0,obs_dim="time",delta_x= np.timedelta64(365, 'D') + np.timedelta64(int(86400/4), 's')):
+        
+        super().__init__(frequency = 4*np.pi,unknown_dim="harmonic_semiannual",obs_dim=obs_dim,delta_x=delta_x)
+        
