@@ -69,3 +69,33 @@ def test_stacked_illposed(noisystacked):
     except XinvIllposedError as e:
         assert True
         
+def test_stacked(noisystacked):
+    """
+    Test a stacked forward operator, consisting of multiple stacked forward operators, building of a normal equation system, and solving step. 
+    Parameters
+    ----------
+    noisystacked : xr.Dataset containing the noisy polynomial observations and the true polynomial coefficients and harmonic coefficients to test against
+
+    """
+
+    #initialize the first polynomial forward operator
+    npoly=noisystacked.sizes['poly']-1
+    polyfwd=Polynomial(n=npoly,poly_x='x',cache=True,x0=0)
+    
+    #initialize the stacked forward operator
+    fwdstck=FwdStackOp(polyfwd)
+
+    #Append Annual and Seminannual fwd operators
+    # fwdstck.append(...)
+
+    # #build the normal equation system
+    std_noise=0.5
+    dsneq=noisystacked.polyobs.xi.build_normal(fwdstck,ecov=std_noise*std_noise) 
+    dssol=dsneq.xi.solve()
+
+    #extract the groups of the solution and compare to the true values
+    dsolpoly=dssol.xi.get_group('poly')
+    prenoise=noisystacked.attrs['noise_std']
+    tol=3*np.sqrt(np.diag(dsolpoly.COV))*prenoise
+    tol=tol.max()
+    assert np.allclose(dsolpoly.solution,noisystacked.polytrue,atol=tol)        

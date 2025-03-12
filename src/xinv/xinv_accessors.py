@@ -9,6 +9,7 @@ from xinv.core.neq import reduce as neqreduce
 from xinv.core.neq import fix as neqfix
 from xinv.core.neq import set_apriori as neqset_apriori
 from xinv.core.neq import add as neqadd
+from xinv.core.grouping import get_group
 
 @xr.register_dataarray_accessor("xi")
 class InverseDaAccessor:
@@ -45,4 +46,5 @@ class InverseDsAccessor:
     def add(self,dsneqother):
         return neqadd(self._obj,dsneqother) #add/merge another normal equation system
 
-
+    def get_group(self,group_name):
+        return get_group(self._obj,group_name)

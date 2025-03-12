@@ -127,3 +127,6 @@ def add(dsneq:xr.Dataset, dsneqother:xr.Dataset):
 def transform(dsneq:xr.Dataset, fwdoperator):
     #tbd transform normal equation system using a forward transformation matrix
     raise NotImplementedError("Transforming NEQS not yet implemented")
+
+
+

@@ -51,18 +51,33 @@ def npara_attrs():
 def group_coord_attrs(state="unlinked"):
     return xinv_attrs("group_coord",state,"xinv coordinate group")
 
-def find_neq_components(dsneq):
-    components=["N","rhs","ltPl","sigma0","nobs","npara"]
+def group_id_attrs(state="unlinked"):
+    return xinv_attrs("group_ids",state,"xinv coordinate of group ids")
+
+def find_component(dsneq,component):
+    try:
+        compname=[ky for ky in dsneq.keys() if dsneq[ky].attrs['xinv_type'] == component ]
+        return dsneq[compname[0]]
+    except KeyError:
+        raise KeyError(f"Cannot find {component} component in NEQ dataset")
+    except IndexError:
+        raise KeyError(f"Cannot find {component} component in NEQ dataset")
+
+def find_components(dsneq,components):
     out=[]
     for comp in components:
-        try:
-            compname=[ky for ky in dsneq.keys() if dsneq[ky].attrs['xinv_type'] == comp ][0]
-        
-            out.append(dsneq[compname])
-        except KeyError:
-            raise KeyError(f"Cannot find {comp} component in NEQ dataset")
-
+        comp_=find_component(dsneq,comp)
+        out.append(comp_)
     return out
+
+
+def find_neq_components(dsneq):
+    components=["N","rhs","ltPl","sigma0","nobs","npara"]
+    return find_components(dsneq,components)
+
+def find_sol_components(dssol):
+    components=["COV","solest","ltPl","sigma0","nobs","npara"]
+    return find_components(dssol,components)
 
 def find_group_coords(dsneq):
     groupcoords={}
