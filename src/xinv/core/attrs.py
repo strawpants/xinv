@@ -48,6 +48,8 @@ def nobs_attrs():
 def npara_attrs():
     return xinv_attrs("npara","initial","number of unknown parameters (explicit and implicit)")
 
+def group_coord_attrs(state="unlinked"):
+    return xinv_attrs("group_coord",state,"xinv coordinate group")
 
 def find_neq_components(dsneq):
     components=["N","rhs","ltPl","sigma0","nobs","npara"]
@@ -62,3 +64,10 @@ def find_neq_components(dsneq):
 
     return out
 
+def find_group_coords(dsneq):
+    groupcoords={}
+    for coordname in dsneq.coords:
+        if "xinv_type" in dsneq[coordname].attrs and dsneq[coordname].attrs['xinv_type'] == "group_coord":
+            groupcoords[coordname]=dsneq[coordname]
+
+    return groupcoords

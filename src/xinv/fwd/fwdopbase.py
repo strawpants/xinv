@@ -4,18 +4,19 @@
 import numpy as np
 from scipy.linalg.blas import dsyrk
 import xarray as xr
-from xinv.core.attrs import rhs_attrs,N_attrs,ltpl_attrs,sigma0_attrs,nobs_attrs,npara_attrs
+from xinv.core.attrs import rhs_attrs,N_attrs,ltpl_attrs,sigma0_attrs,nobs_attrs,npara_attrs,find_group_coords
 
 
 
 class FwdOpbase:
-    def __init__(self,obs_dim=None,unknown_dim=None,cache=False):
+    def __init__(self,obs_dim=None,unknown_dim=None,cache=False,jacobname="jacobian"):
         self._obsdim=obs_dim
         self._unkdim=unknown_dim
         self._unkdim_t=unknown_dim+"_"
         self._daobs=None
         self._cache_jacobian=cache
         self._jacob=None
+        self._jacobname=jacobname
 
     def jacobian(self,daobs=None): 
         """Create the Jacobian of the forward operator"""
@@ -25,6 +26,10 @@ class FwdOpbase:
             return self._jacob
 
         jacob=self._jacobian_impl(daobs)
+        if type(jacob) == xr.DataArray:
+            jacob.name=self._jacobname
+            jacob=jacob.to_dataset()
+        
         if self._cache_jacobian:
             self._jacob=jacob
 
@@ -38,8 +43,10 @@ class FwdOpbase:
 
         
         #create a design matrix for the given observations
-        dadesign=self.jacobian(daobs)
-        
+        dsdesign=self.jacobian(daobs)
+         
+        dadesign=dsdesign[self._jacobname]
+
         if daobs.dims[0] != self._obsdim:
             #garantee that the observation dimension is the first dimension
             daobs=daobs.T
@@ -78,7 +85,13 @@ class FwdOpbase:
 
 
         dsout=xr.Dataset(dict(N=((self._unkdim,self._unkdim_t),normal_matrix),rhs=rhs,ltpl=ltpl,sigma0=((nrhsdim),sigma0),nobs=((nrhsdim),nobs),npara=((nrhsdim),npara)))
-        
+       
+        #possibly add back group coordinates if present in the design matrix
+        #...
+        groupcoords=find_group_coords(dsdesign)
+        if groupcoords:
+            dsout=dsout.assign_coords(groupcoords)
+        #add attributes
         dsout.N.attrs.update(N_attrs(lower))
         dsout.rhs.attrs.update(rhs_attrs())
         dsout.ltpl.attrs.update(ltpl_attrs('apriori'))
@@ -89,4 +102,4 @@ class FwdOpbase:
     
     def __call__(self,inpara):
         """Apply the forward operator"""
-        return self.jacobian()@inpara
+        return self.jacobian()[self._jacobname]@inpara
