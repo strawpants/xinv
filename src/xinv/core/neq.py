@@ -3,7 +3,7 @@
 
 
 from scipy.linalg import cholesky
-from scipy.linalg.blas import dtrsm
+from scipy.linalg.blas import dtrsm, dsyrk # import dsyrk
 from scipy.linalg.lapack import dpotri
 from xinv.core.attrs import cov_attrs,solest_attrs,ltpl_attrs,find_neq_components,sigma0_attrs,Chol_attrs
 from xinv.core.exceptions import XinvIllposedError
@@ -124,9 +124,56 @@ def add(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     #tbd add/merge two normal equation systems
     raise NotImplementedError("Adding/merging NEQS not yet implemented")
 
+
+    
 def transform(dsneq:xr.Dataset, fwdoperator):
-    #tbd transform normal equation system using a forward transformation matrix
-    raise NotImplementedError("Transforming NEQS not yet implemented")
+    """ Transform the normal equation system using a forward operator matrix (e.g., the decorrelated jacobian matrix)"""
+    
+    if not inplace:
+        # copy entire NEQ and operate on that one in place
+        dsneq=dsneq.copy(deep=True)
+    
+    N,rhs,ltpl,sigma0,nobs,npara=find_neq_components(dsneq)
+        
+    trns_param=fwdoperator.shape[0] #number of transformed parameters
+    
+    Nnew=np.zeros((trns_param,trns_param))
+    rhsnew=np.zeros((trns_param,1))
+    ltplnew=np.zeros((trns_param,))
+    
+    for i in range(prd):
+        Nnew[i]=dsyrk(1.0,fwdoperator[i],trans=1,lower=1)
+        rhsnew[i]=(fwdoperator.T@rhs).reshape(-1,1) # replace with xinv * later
+        ltplnew[i]=ltpl[i]  ## add an if condition for changing the ltpl if set_apriori changes
+        
+    
+    # from xinv.core.attrs import ltplnew_attrs,Nnew_attrs,rhsnew_attrs
+    # N.attrs.update(Nnew_attrs())
+    # ltpl.attrs.update(ltplnew_attrs())
+    # rhs.attrs.update(rhsnew_attrs())
+
+    dsneq["N"]=Nnew
+    dsneq["rhs"]=rhsnew
+    dsneq["ltpl"]ltplnew
+    
+#    dsneq=dsneq.rename(dict(N='Nnew',rhs='rhsnew',ltpl='ltplnew'))
+    
+    
+    if inplace:
+        return None
+    else:
+        return dsneq
 
 
 
+# def scaling_factor(Nnew, rhsnew):
+    
+#     """ This function returns TWS in Gton """
+    
+#     prd = Nnew.shape[0]
+#     xnew = np.zeros((prd,124,1))
+    
+#     for i in range(prd):
+#         xnew[i] = solve_triangular(Nnew[i], rhsnew[i], trans = 'N', lower=True)
+            
+#     return np.squeeze(xnew)
