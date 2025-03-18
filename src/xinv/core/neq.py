@@ -121,17 +121,76 @@ def set_apriori(dsneq:xr.Dataset, daapri:xr.DataArray):
 
 
 def add(dsneq:xr.Dataset, dsneqother:xr.Dataset):
-    #tbd add/merge two normal equation systems
-    raise NotImplementedError("Adding/merging NEQS not yet implemented")
+    """ merge two normal equation systems"""
+    
+    #N1,rhs1,ltpl1,sigma01,nobs1,npara1=find_neq_components(dsneq)
+    #N2,rhs2,ltpl2,sigma02,nobs2,npara2=find_neq_components(dsneqother)
+    
+    if set(dsneq.variables) !=set(dsneqother.variables):
+        raise TypeError("Datasets should have the same variables")
+    if set(dsneq.dims) != set(dsneqother.dims):
+        raise TypeError("Datasets should have the same dimensions")
+    
+#     if not dsneq.equals(dsneqother):
+#         raise TypeError("Datasets are not identical and cannot be merged")
+     
+    if "fingerprints" not in dsneq.dims:
+        dsneq=dsneq.expand_dims("fingerprints")
+    if "fingerprints" not in dsneqother.dims:
+        dsneqother=dsneqother.expand_dims("fingerprints")
+                                     
+    if "N" in dsneq and "N" in dsneqother:
+        Nnew=xr.concat([dsneq.N,dsneqother.N],dim="fingerprints") # fingerprints refers to the characteristic spatial patterns of mass change such as ice sheet, glaciers, TWS and GIA changes
+    else:
+        raise TypeError("Both datasets should have N")
 
+    if "rhs" in dsneq and "rhs" in dsneqother:
+        rhsnew=xr.concat([dsneq.rhs,dsneqother.rhs],dim="fingerprints")
+    else:
+        raise TypeError("Both datasets should have rhs")
+        
+    if "ltpl" in dsneq and "ltpl" in dsneqother:
+        ltplnew=xr.concat([dsneq.ltpl,dsneqother.ltpl],dim="fingerprints")
+    else:
+        raise TypeError("Both datasets should have ltpl")
+        
+    order='C'
+    coords={**dsneq.coords,**dsneqother.coords}
+    dsneq_merged=xr.Dataset(data_vars=dict(N=(Nnew.dims,Nnew.data),rhs=(rhsnew.dims,rhsnew.data),ltpl=(ltplnew.dims,ltplnew.data)),coords=coords)
 
+        
+    return dsneq_merged
+
+    
+    
+def merge(fwdoperator,fwdoperatorother):
+    """ Merge two design matrices that are composed of the corresponding fingerprints"""
+    
+    ## create a new coordinate that represents the number of basins
+    
+    
+    
+    Basin_fgprn1=[str(x) for x in fwdoperator.coords["basinid"].values]
+    basin_fgprn2=[str(x) for x in fwdoperatorother.coords["basins"].values]
+    
+    basinsnum=np.concatenate([Basin_fgprn1,basin_fgprn2])
+
+    fwdoperator, fwdoperatorother = xr.align(fwdoperator, fwdoperatorother, join="outer", fill_value=0)
+
+    jac_basins=np.hstack([fwdoperator.values,fwdoperatorother.values])
+    
+    dim=fwdoperatorother.dims
+    mrgd_fwdoperator=xr.DataArray(jac_basins,dims=dim,coords=dict(nm=fwdoperator.coords["nm"],basins=basinsnum))
+
+    return mrgd_fwdoperator
+    
     
 def transform(dsneq:xr.Dataset, fwdoperator):
     """ Transform the normal equation system using a forward operator matrix (e.g., the decorrelated jacobian matrix)"""
     
-    if not inplace:
-        # copy entire NEQ and operate on that one in place
-        dsneq=dsneq.copy(deep=True)
+    # if not inplace:
+    #     # copy entire NEQ and operate on that one in place
+    #     dsneq=dsneq.copy(deep=True)
     
     N,rhs,ltpl,sigma0,nobs,npara=find_neq_components(dsneq)
         
@@ -166,14 +225,14 @@ def transform(dsneq:xr.Dataset, fwdoperator):
 
 
 
-# def scaling_factor(Nnew, rhsnew):
+def scaling_factor(dsneq:xr.Dataset,fwdoperator):
+    """ This function returns TWS in Gton by solving the normal equation system"""
+    N,rhs,ltpl,sigma0,nobs,npara=find_neq_components(dsneq)
     
-#     """ This function returns TWS in Gton """
+    prd=N.shape[0]
+    x=np.zeros((prd,fwdoperator.shape[1],1))
     
-#     prd = Nnew.shape[0]
-#     xnew = np.zeros((prd,124,1))
-    
-#     for i in range(prd):
-#         xnew[i] = solve_triangular(Nnew[i], rhsnew[i], trans = 'N', lower=True)
+    for i in range(prd):
+        x[i] = solve_triangular(N[i], rhs[i], trans = 'N', lower=True) ## fix the lower-upper later
             
-#     return np.squeeze(xnew)
+    return np.squeeze(x)
