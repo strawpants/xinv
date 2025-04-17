@@ -213,7 +213,7 @@ def transform(dsneq:xr.Dataset, fwdoperator):
 
     dsneq["N"]=Nnew
     dsneq["rhs"]=rhsnew
-    dsneq["ltpl"]ltplnew
+    dsneq["ltpl"]=ltplnew
     
 #    dsneq=dsneq.rename(dict(N='Nnew',rhs='rhsnew',ltpl='ltplnew'))
     
