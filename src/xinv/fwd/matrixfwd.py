@@ -3,7 +3,7 @@
 
 from xinv.fwd import FwdOpbase
 
-class MatrixfwdOp(fwdOpbase):
+class MatrixfwdOp(FwdOpbase):
     
     def __init__(self,dajac):
         
