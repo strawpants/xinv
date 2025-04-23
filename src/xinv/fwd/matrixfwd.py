@@ -4,7 +4,7 @@
 from xinv.fwd import FwdOpbase
 
 class MatrixfwdOp(FwdOpbase):
-    def __init__(self,dajac,obs_dim="obs_dim",unknown_dim="unknown_dim"):
+    def __init__(self,dajac,obs_dim="obsdim",unknown_dim="unknowndim"):
 
         super().__init__(obs_dim=obs_dim,unknown_dim=unknown_dim)
         self._dajac=dajac
