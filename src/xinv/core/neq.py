@@ -123,66 +123,45 @@ def set_apriori(dsneq:xr.Dataset, daapri:xr.DataArray):
 def add(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     """ merge two normal equation systems"""
     
-    #N1,rhs1,ltpl1,sigma01,nobs1,npara1=find_neq_components(dsneq)
-    #N2,rhs2,ltpl2,sigma02,nobs2,npara2=find_neq_components(dsneqother)
+    N1,rhs1,ltpl1,sigma01,nobs1,npara1=find_neq_components(dsneq)
+    N2,rhs2,ltpl2,sigma02,nobs2,npara2=find_neq_components(dsneqother)
     
-    if set(dsneq.variables) !=set(dsneqother.variables):
-        raise TypeError("Datasets should have the same variables")
-    if set(dsneq.dims) != set(dsneqother.dims):
-        raise TypeError("Datasets should have the same dimensions")
+    #check matrix compatibility
+    #check if N is in upper triangular or lower triangular form
+    if N1.attrs['xinv_state']!=N2.attrs['xinv_state']:
+        raise RuntimeError(f"Can't merge NEQs with different xinv_state:{N1.attrs['xinv_state']} vs {N2.attrs['xinv_state']}")
     
-#     if not dsneq.equals(dsneqother):
-#         raise TypeError("Datasets are not identical and cannot be merged")
-     
-    if "fingerprints" not in dsneq.dims:
-        dsneq=dsneq.expand_dims("fingerprints")
-    if "fingerprints" not in dsneqother.dims:
-        dsneqother=dsneqother.expand_dims("fingerprints")
-                                     
-    if "N" in dsneq and "N" in dsneqother:
-        Nnew=xr.concat([dsneq.N,dsneqother.N],dim="fingerprints") # fingerprints refers to the characteristic spatial patterns of mass change such as ice sheet, glaciers, TWS and GIA changes
-    else:
-        raise TypeError("Both datasets should have N")
 
-    if "rhs" in dsneq and "rhs" in dsneqother:
-        rhsnew=xr.concat([dsneq.rhs,dsneqother.rhs],dim="fingerprints")
-    else:
-        raise TypeError("Both datasets should have rhs")
-        
-    if "ltpl" in dsneq and "ltpl" in dsneqother:
-        ltplnew=xr.concat([dsneq.ltpl,dsneqother.ltpl],dim="fingerprints")
-    else:
-        raise TypeError("Both datasets should have ltpl")
-        
-    order='C'
-    coords={**dsneq.coords,**dsneqother.coords}
-    dsneq_merged=xr.Dataset(data_vars=dict(N=(Nnew.dims,Nnew.data),rhs=(rhsnew.dims,rhsnew.data),ltpl=(ltplnew.dims,ltplnew.data)),coords=coords)
+    n1=rhs1.sizes["nm"]
+    n2=rhs2.sizes["nm"]
+    n=n1+n2
+
+    nm1=np.arange(n1)
+    nm2=np.arange(n2)+n1
+    nm=np.concatenate([nm1,nm2])
+    
+    coords=dict(time=("time",dsneq.coords["time"].values),nm=("nm",nm),nm_=("nm_",nm))
+
+    N=xr.DataArray(data=np.zeros((1,n,n),dtype=N1.dtype),dims=["time", "nm", "nm_"],
+    coords=coords,attrs=dict(xinv_state=N1.attrs["xinv_state"]))
+
+    N.data[0,:n1,:n1]=N1.data[0]
+    N.data[0,n1:,n1:]=N2.data[0]
+
+    rhs1=xr.DataArray(rhs1.data,dims=rhs1.dims,coords=dict(time=rhs1.coords["time"],nm=nm1))
+    rhs2=xr.DataArray(rhs2.data,dims=rhs2.dims,coords=dict(time=rhs2.coords["time"],nm=nm2))
+    rhs=xr.concat([rhs1,rhs2],dim="nm")
+
+    ltpl=ltpl1+ltpl2
+    nobs=nobs1+nobs2
+    npara=npara1+npara2
+
+    dsneq_merged=xr.Dataset(data_vars=dict(N=(N.dims,N.data),rhs=(rhs.dims,rhs.data),ltpl=(ltpl.dims,ltpl.data),nobs=(nobs.dims,nobs.data),
+    npara=(npara.dims,npara.data)),coords=coords)
 
         
     return dsneq_merged
 
-    
-    
-def merge(fwdoperator,fwdoperatorother):
-    """ Merge two design matrices that are composed of the corresponding fingerprints"""
-    
-    ## create a new coordinate that represents the number of basins
-    
-    
-    
-    Basin_fgprn1=[str(x) for x in fwdoperator.coords["basinid"].values]
-    basin_fgprn2=[str(x) for x in fwdoperatorother.coords["basins"].values]
-    
-    basinsnum=np.concatenate([Basin_fgprn1,basin_fgprn2])
-
-    fwdoperator, fwdoperatorother = xr.align(fwdoperator, fwdoperatorother, join="outer", fill_value=0)
-
-    jac_basins=np.hstack([fwdoperator.values,fwdoperatorother.values])
-    
-    dim=fwdoperatorother.dims
-    mrgd_fwdoperator=xr.DataArray(jac_basins,dims=dim,coords=dict(nm=fwdoperator.coords["nm"],basins=basinsnum))
-
-    return mrgd_fwdoperator
     
     
 def transform(dsneq:xr.Dataset, fwdoperator):
@@ -225,14 +204,3 @@ def transform(dsneq:xr.Dataset, fwdoperator):
 
 
 
-def scaling_factor(dsneq:xr.Dataset,fwdoperator):
-    """ This function returns TWS in Gton by solving the normal equation system"""
-    N,rhs,ltpl,sigma0,nobs,npara=find_neq_components(dsneq)
-    
-    prd=N.shape[0]
-    x=np.zeros((prd,fwdoperator.shape[1],1))
-    
-    for i in range(prd):
-        x[i] = solve_triangular(N[i], rhs[i], trans = 'N', lower=True) ## fix the lower-upper later
-            
-    return np.squeeze(x)
