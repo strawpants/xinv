@@ -3,13 +3,14 @@
 
 import xarray as xr
 
-from xinv.core.neq import solve as neqsolve
-from xinv.core.neq import transform as neqtransform
-from xinv.core.neq import reduce as neqreduce
-from xinv.core.neq import fix as neqfix
-from xinv.core.neq import set_apriori as neqset_apriori
-from xinv.core.neq import add as neqadd
-from xinv.core.grouping import get_group
+from xinv.neq import solve as neqsolve
+from xinv.neq import transform as neqtransform
+from xinv.neq import reduce as neqreduce
+from xinv.neq import fix as neqfix
+from xinv.neq import set_apriori as neqset_apriori
+from xinv.neq import add as neqadd
+from xinv.neq import zeros as neqzeros
+from xinv.core.grouping import get_group,reindex_groups,rename_groups
 
 @xr.register_dataarray_accessor("xi")
 class InverseDaAccessor:
@@ -48,3 +49,15 @@ class InverseDsAccessor:
 
     def get_group(self,group_name):
         return get_group(self._obj,group_name)
+
+    def reindex_groups(self):
+        """
+        Reindex/rebuild the group coordinates and multinded in the dataset to match the original coordinates
+        """
+        return reindex_groups(self._obj)
+    def rename_groups(self,grpmap):
+        return rename_groups(self._obj,grpmap)
+
+    @staticmethod
+    def neqzeros(rhsdims,coords,lower=0):
+        return neqzeros(rhsdims=rhsdims,coords=coords,lower=lower)

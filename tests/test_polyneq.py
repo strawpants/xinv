@@ -7,6 +7,12 @@ import xarray as xr
 import numpy as np
 from xinv import *
 from xinv.fwd.polynomial import Polynomial
+import os
+
+
+neqpolyf=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_simple.nc')
+
+rg=np.random.default_rng(12789)
 
 @pytest.fixture(params=['C','F'])
 def noisypoly(request):
@@ -29,7 +35,7 @@ def noisypoly(request):
         polyobs[i,:]=np.polyval(polytrue[i,::-1],x_axis_rel)
     
     #add some normal noise
-    polyobs+= np.random.normal(0,noise_std,polyobs.shape)
+    polyobs+= rg.normal(0,noise_std,polyobs.shape)
     
     # create a naming of the auxdims
     auxcoord=[f"aux_{i}" for i in range(naux)]
@@ -56,6 +62,9 @@ def test_polyneqs(noisypoly):
     #build the normal equation system
     std_noise=0.5
     dsneq=noisypoly.polyobs.xi.build_normal(polyfwd,ecov=std_noise*std_noise) 
+    if not os.path.exists(neqpolyf):
+        #save the normal equation system to a file (for use in other tests)
+        dsneq.to_netcdf(neqpolyf)
 
     dssol=dsneq.xi.solve()
     

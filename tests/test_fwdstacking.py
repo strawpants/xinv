@@ -10,6 +10,12 @@ from xinv.fwd.polynomial import Polynomial
 from xinv.fwd.harmonics import SeasonalHarmonics
 from xinv.fwd.fwdstack import FwdStackOp
 from xinv.core.exceptions import XinvIllposedError
+import os
+
+neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly.nc')
+
+#note apply a seed to garantee reproducibility (otherwise tests may fail in  statistical sense)
+rg=np.random.default_rng(12789)
 
 @pytest.fixture(params=['C','F'])
 def noisystacked(request):
@@ -49,7 +55,7 @@ def noisystacked(request):
         obs[i,:]+=camp*np.cos(omegas[0]*t_axis_rel)+samp*np.sin(omegas[0]*t_axis_rel)+scamp*np.cos(omegas[1]*t_axis_rel)+ssamp*np.sin(omegas[1]*t_axis_rel)
 
     #add some normal noise
-    obs+= np.random.normal(0,noise_std,obs.shape)
+    obs+= rg.normal(0,noise_std,obs.shape)
     
     # create a naming of the auxdims
     auxcoord=[f"aux_{i}" for i in range(naux)]
@@ -81,6 +87,7 @@ def test_illposed(noisystacked):
     # #build the normal equation system
     std_noise=0.5
     dsneq=noisystacked.obs.xi.build_normal(fwdstck,ecov=std_noise*std_noise) 
+
     try:
         dssol=dsneq.xi.solve()
         #we're not supposed to end up here
@@ -112,7 +119,11 @@ def test_stacked(noisystacked):
 
     # #build the normal equation system
     std_noise=0.5
-    dsneq=noisystacked.obs.xi.build_normal(fwdstck,ecov=std_noise*std_noise) 
+    dsneq=noisystacked.obs.xi.build_normal(fwdstck,ecov=std_noise*std_noise)
+    if not os.path.exists(neqfile1):
+        #write the normal equation system to a file (used for other tests)
+        dsneq.reset_index('xinv_unk').to_netcdf(neqfile1)
+
     dssol=dsneq.xi.solve()
 
     #extract the groups of the solution and compare to the true values
