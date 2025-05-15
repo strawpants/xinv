@@ -4,7 +4,7 @@
 import numpy as np
 from scipy.linalg.blas import dsyrk
 import xarray as xr
-from xinv.core.attrs import rhs_attrs,N_attrs,ltpl_attrs,sigma0_attrs,nobs_attrs,npara_attrs,find_group_coords
+from xinv.core.attrs import rhs_attrs,N_attrs,ltpl_attrs,sigma0_attrs,nobs_attrs,npara_attrs,find_xinv_coords, xunk_coords_attrs,aux_coords_attrs
 
 
 
@@ -29,10 +29,13 @@ class FwdOpbase:
         if type(jacob) == xr.DataArray:
             jacob.name=self._jacobname
             jacob=jacob.to_dataset()
+        #add xunk_coord attributes to possible coordinate
+        if self._unkdim in jacob.coords:
+            jacob[self._unkdim].attrs.update(xunk_coords_attrs(state='linked'))
         
+
         if self._cache_jacobian:
             self._jacob=jacob
-
         return jacob
 
     def build_normal(self,daobs,ecov=1):
@@ -79,18 +82,25 @@ class FwdOpbase:
         #allow for multiple right hand sides
         ltpl=daobs.dot(daobs,dim=self._obsdim)
         
-        #set number of observations and unknown parameters
-        nobs=daobs.sizes[self._obsdim]*np.ones(nrhs)
-        npara=normal_matrix.shape[0]*np.ones(nrhs)
+        #set number of observations and unknown parameters (ensure integer type)
+        nobs=daobs.sizes[self._obsdim]*np.ones(nrhs,dtype=np.int64)
+        npara=normal_matrix.shape[0]*np.ones(nrhs,dtype=np.int64)
+        
+        #tag auxiliary coords in rhs as xinv_types
+        if len(rhs.shape) > 1: 
+            auxdim=[dim for dim in rhs.dims if dim != self._unkdim][0]
+            #add auxialiary_coord attributes to possible coordinate
+            rhs.coords[auxdim].attrs.update(aux_coords_attrs(state='linked'))
+        
+        xinvcoords=find_xinv_coords(dsdesign)
+        #update with the relevant coordinates from the righthand side matrix
+        xinvcoords.update({name:coord for name,coord in rhs.coords.items() if name not in xinvcoords.keys()})
+        dsout=xr.Dataset(dict(N=((self._unkdim,self._unkdim_t),normal_matrix.data),rhs=(rhs.dims,rhs.data),ltpl=((nrhsdim),ltpl.data),sigma0=((nrhsdim),sigma0.data),nobs=((nrhsdim),nobs.data),npara=((nrhsdim),npara.data)),coords=xinvcoords)
+        #for some reason the coordinate attributes do not get properly propagated
+        #so make sure they are added
+        for key,coord in xinvcoords.items():
+            dsout[key].attrs.update(coord.attrs)
 
-
-        dsout=xr.Dataset(dict(N=((self._unkdim,self._unkdim_t),normal_matrix),rhs=rhs,ltpl=ltpl,sigma0=((nrhsdim),sigma0),nobs=((nrhsdim),nobs),npara=((nrhsdim),npara)))
-       
-        #possibly add back group coordinates if present in the design matrix
-        #...
-        groupcoords=find_group_coords(dsdesign)
-        if groupcoords:
-            dsout=dsout.assign_coords(groupcoords)
         #add attributes
         dsout.N.attrs.update(N_attrs(lower))
         dsout.rhs.attrs.update(rhs_attrs())
