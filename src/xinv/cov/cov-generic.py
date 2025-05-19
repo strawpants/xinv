@@ -4,46 +4,63 @@
 import numpy as np
 import xarray as xr
 from scipy.linalg import cholesky
-from xinv.core.grouping import expand_as_group
+from xinv.core.grouping import build_group_coord,find_group_coords
 
-import numpy as np
-import xarray as xr
-from scipy.linalg import cholesky
-from xinv.core.grouping import expand_as_group
-
-class CovarianceBase:
-    def __init__(self):
-        self._cov=[]
-
-    def decorrelate(self, damat):
-        pass
-    
 
 class CovarianceMat(CovarianceBase):
-    def __init__(self,N_or_Cov,error_cov=True,group_id_dim="xinv_grp_id",group_seq_dim="xinv_grp_seq"):
-        super().__init__()
-        self._group_id_dim=group_id_dim
-        self._group_seq_dim=group_seq_dim
+    def __init__(self,N_or_Cov="Normal or Covariance matrix",error_cov=True):
 
 
         if error_cov is True:
-            N=xr.apply_ufunc(np.linalg.inv,N_or_Cov)
+            cov=N_or_Cov
+            N=xr.apply_ufunc(np.linalg.inv,cov)
         else:
             N=N_or_Cov
+            cov=xr.apply_ufunc(np.linalg.inv,N)
 
-        row_dim,col_dim=N.dims
+        super().__init__(cov=cov,N=N)
 
-        Nout=N.to_dataset(name="Nmat")
-        Ngroup=expand_as_group(Nout,group_dim=row_dim,group_id_dim=group_id_dim,group_seq_dim=group_seq_dim)
+        # get the covariance matrix for each block after splitting the transformed N into blocks -block wise covariance matrices
+        #N = BTATPAB = BTNB
 
+       # check if N already has group id
+       grp_id_co, grp_seq_co = find_group_coords(N)
 
+       if grp_id_co is None and grp_seq_co is None:
+           
+           unkdim=N.dims[0]
 
-        dsout=xr.apply_ufunc(cholesky,Ngroup[0]) ######### incomplete
+           grp_co=build_group_coord(N,dim=unkdim,group_id_name=group_id_co.name,group_seq_name=group_seq_co.name)
+            
+           
+        self._group_id_dim=group_id_dim
+        self._group_seq_dim=group_seq_dim
+
+        
+
+        dsout=xr.apply_ufunc(cholesky,Ngroup) ######### incomplete
 
         self._N=dsout
 
-    def decorrelate(self,damat): 
-        pass
+    def decorrelate(self,damat):       
+
+        group_id_co,group_seq_co=find_group_coords(damat)
+        dsout=xr.dot(self._Ncholesky,damat)
+
+        return dsout
+
+class DiagonalCovarianceMat(CovarianceBase):
+    def __init__(self,diag_std):
+
+        cov=xr.apply_ufunc(np.square,diag_std) 
+        N=1/cov                
+        super().__init__(cov=cov,N=N)        
+        self._var=cov
+    
+    def decorrelate(self,damat):
+        
+        dsout=damat/self._var 
+        return dsout
 
     
 

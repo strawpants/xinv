@@ -11,6 +11,7 @@ class CovarianceMat(CovarianceBase):
         if error_cov is True:
             cov=N_or_Cov
             N=xr.apply_ufunc(np.linalg.inv,cov)
+            #,vectorize=True
         else:
             N=N_or_Cov
             cov=xr.apply_ufunc(np.linalg.inv,N)
