@@ -5,37 +5,46 @@ import numpy as np
 import xarray as xr
 from scipy.linalg import cholesky
 
+from xinv.cov import covariancebase
+from xinv.cov.covariancebase import CovarianceBase
+
 class CovarianceMat(CovarianceBase):
     def __init__(self,N_or_Cov="Normal or Covariance matrix",error_cov=True):
 
         if error_cov is True:
             cov=N_or_Cov
             N=xr.apply_ufunc(np.linalg.inv,cov)
-            #,vectorize=True
         else:
             N=N_or_Cov
             cov=xr.apply_ufunc(np.linalg.inv,N)
 
-        super().__init__(cov=cov,N=N)
+        super().__init__(N=N)
 
-        self._Ncholesky=xr.apply_ufunc(cholesky,N,input_core_dims=[["nm","nm_"]],output_core_dims=[["nm","nm_"]],kwargs={"lower":True})
+        naux_,naux=N.dims
 
-    def decorrelate(self,damat):        
-        dsout=xr.dot(self._Ncholesky,damat)
+        
+        self._Ncholesky=xr.apply_ufunc(cholesky,N,input_core_dims=[["naux_","naux"]],output_core_dims=[["naux_","naux_"]],kwargs={"lower":True})
 
-        return dsout
+
+    
+    def _decorrelate_impl(self,damat):        
+        
+        decorrelated=xr.dot(self._Ncholesky,damat)
+
+        return decorrelated
 
 class DiagonalCovarianceMat(CovarianceBase):
     def __init__(self,diag_std):
 
-        cov=xr.apply_ufunc(np.square,diag_std) 
-        N=1/cov                
-        super().__init__(cov=cov,N=N)        
-        self._var=cov
+        var=xr.apply_ufunc(np.square,diag_std) 
+        N=1/var                
+        super().__init__(N=N)        
+        self._var=var
     
-    def decorrelate(self,damat):
+    def _decorrelate_impl(self,damat):
         
-        dsout=damat/self._var 
-        return dsout
+        decorrelated=damat/self._var 
+
+        return decorrelated
         
     
