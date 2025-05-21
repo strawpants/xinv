@@ -6,9 +6,9 @@
 from collections import namedtuple
 
 #centrally define the xinv attributes
-_xinvtype=namedtuple("_xinvtype","unk_co aux_co grp_id_co grp_seq_co N COV rhs solest ltpl sigma0 nobs npara")
+_xinvtype=namedtuple("_xinvtype","unk_co aux_co grp_id_co grp_seq_co N COV rhs solest stdsolest x0 ltpl sigma0 nobs npara")
 
-xinv_tp=_xinvtype("unk_coord","aux_coord","group_id_coord","group_seq_coord","N","COV", "rhs","solest","ltPl","sigma0","nobs","npara")
+xinv_tp=_xinvtype("unk_coord","aux_coord","group_id_coord","group_seq_coord","N","COV", "rhs","solest","solest_std","aprioriVec","ltPl","sigma0","nobs","npara")
 
 
 _xinvstate=namedtuple("_xinvstate","linked unlinked init apri post symU symL cholU cholL")
@@ -21,8 +21,14 @@ def xinv_attrs(xitype,xistate,xidescr):
 def rhs_attrs():
     return xinv_attrs(xinv_tp.rhs,xinv_st.init,"right hand side vector")
 
+def x0_attrs():
+    return xinv_attrs(xinv_tp.x0,xinv_st.apri,"Apriori solution estimate")
+
 def solest_attrs():
     return xinv_attrs(xinv_tp.solest,xinv_st.init,"solution estimate")
+
+def stdsolest_attrs():
+    return xinv_attrs(xinv_tp.stdsolest,xinv_st.init,"Standard deviations of the solution estimate")
 
 
 def N_attrs(lower=0):
@@ -131,3 +137,30 @@ def find_xinv_coords(dsneq,exclude=None,include=None,state=None):
             xinvcoords[coordname]=dsneq[coordname]
 
     return xinvcoords
+
+
+def get_xunk_size_coname(dsneq):
+    """Retrieve the size and name of the currently linked unknown coordinate
+    """
+    xunk_co=find_xinv_coords(dsneq,include=[xinv_tp.unk_co],state=xinv_st.linked)
+    xunkconame=next(iter(xunk_co))
+    return dsneq.sizes[xunk_co[xunkconame].dims[0]],xunkconame
+
+
+
+def change_state(davar,state):
+    """
+    Change the state of a variable to a new state
+    Parameters
+    ----------
+    davar : xarray.DataArray
+        The data array to change the state of.
+    state : str
+        The new state to set.
+
+    Returns
+    -------
+    None.
+    """
+    if "xinv_state" in davar.attrs:
+        davar.attrs["xinv_state"]=state

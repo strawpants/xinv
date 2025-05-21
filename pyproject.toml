@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0","setuptools-scm>=8","packaging"]
+requires = ["setuptools>=61.0","setuptools-scm>=8","packaging","Cython>=3","wheel","numpy"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "xinv"
@@ -29,7 +29,7 @@ dask=["dask>=2022.9.2"]
 version_file = "src/xinv/_version.py"
 
 [project.entry-points."xarray.backends"]
-#icgem = "shxarray.io.shiobackend:ICGEMBackEntryPoint"
+sinex ="xinv.io.xinviobackends:SINEXBackEntryPoint"
 
 
 [project.urls]
