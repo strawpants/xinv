@@ -111,6 +111,13 @@ def get_group(dsneq,groupname):
 
     """
     xinvcoords=find_xinv_coords(dsneq)
+    try:
+        if type(dsneq.indexes[groupname]) == pd.MultiIndex:
+            groupismindex=True
+        else:
+            groupismindex=False
+    except: 
+        groupismindex=False
 
     #create an index vector of the data asssociated with the groupname
     
@@ -122,21 +129,46 @@ def get_group(dsneq,groupname):
     grpidx=dsneq[group_id_name] == groupname
     
     try:
-        unkdims=find_component(dsneq,xinv_tp.N).dims
+        unkdim=find_component(dsneq,xinv_tp.rhs).dims[0]
     except KeyError:
-        unkdims=find_component(dsneq,xinv_tp.COV).dims
+        unkdim=find_component(dsneq,xinv_tp.solest).dims[0]
+    unkdim_=f"{unkdim}_"
 
-    #extract the relevant subsections
-    dsout=dsneq[{unkdims[0]:grpidx.data,unkdims[1]:grpidx.data}] 
-    #extract the relevant original coordinate components
+    try:
+        find_component(dsneq,xinv_tp.N)
+        find_component(dsneq,xinv_tp.COV)
+        #extract the relevant subsections
+        dsout=dsneq[{unkdim:grpidx.data,unkdim_:grpidx.data}] 
+        rename={unkdim:groupname,unkdim_:groupname+"_"}
+        hasmatrix=True
+    except KeyError:
+        dsout=dsneq[{unkdim:grpidx.data}] 
+        rename={unkdim:groupname}
+        hasmatrix=False
+
+    
     groupcoord=dsout[groupname][dsout[group_seq_name]]
+    
     #multindex and all levels must be dropped
-    dropvars=[nm for nm in dsout.get_index(unkdims[0]).names]
-    dropvars.append(unkdims[0])
+    dropvars=[nm for nm in dsout.get_index(unkdim).names]
+    dropvars.append(unkdim)
+    if groupismindex:
+        #also add all levels of the group to drop
+        dropvars.extend([nm for nm in dsout.get_index(groupname).names])
+
     #also drop the groupname varibale (will be readded later)
     dropvars.append(groupname)
+    dsout=dsout.drop_vars(dropvars).rename(rename)
+    #extract the relevant original coordinate components
+    if groupismindex:
+        groupcoord=pd.MultiIndex.from_tuples(groupcoord.data,names=dsneq.get_index(groupname).names)
+        groupcoord=xr.Coordinates.from_pandas_multiindex(groupcoord,dim=groupname)
+        dsout=dsout.assign_coords(groupcoord)
+    else:
 
-    dsout=dsout.drop_vars(dropvars).rename({unkdims[0]:groupname,unkdims[1]:groupname+"_"}).assign_coords({groupname:(groupname,groupcoord.data)})
+        dsout=dsout.assign_coords({groupname:(groupname,groupcoord.data)})
+    #possibly rebuild the multindex if the original group was a multindex
+    #add xinv attributes
     dsout[groupname].attrs.update(xunk_coords_attrs(state="linked"))
 
     return dsout
