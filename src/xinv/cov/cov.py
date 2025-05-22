@@ -23,7 +23,7 @@ class CovarianceMat(CovarianceBase):
         naux_,naux=N.dims
 
         
-        self._Ncholesky=xr.apply_ufunc(cholesky,N,input_core_dims=[["naux_","naux"]],output_core_dims=[["naux_","naux_"]],kwargs={"lower":True})
+        self._Ncholesky=xr.apply_ufunc(cholesky,N,input_core_dims=[["nm","nm_"]],output_core_dims=[["nm","nm_"]],kwargs={"lower":True})
 
 
     
@@ -36,14 +36,15 @@ class CovarianceMat(CovarianceBase):
 class DiagonalCovarianceMat(CovarianceBase):
     def __init__(self,diag_std):
 
-        var=xr.apply_ufunc(np.square,diag_std) 
-        N=1/var                
-        super().__init__(N=N)        
-        self._var=var
-    
+        self._Ncholesky=1/diag_std
+        N=xr.apply_ufunc(np.square,self._Ncholesky) 
+        super().__init__(N=N)
+        
     def _decorrelate_impl(self,damat):
         
-        decorrelated=damat/self._var 
+
+        decorrelated=self._Ncholesky*damat
+
 
         return decorrelated
         

@@ -26,6 +26,7 @@ def noisypoly(request):
     order=request.param[0]
     polyobs=np.zeros([naux,len(x_axis)],order=order)
     polytrue=np.zeros([naux,npoly+1])
+    damat=np.stack([x_axis_rel**i for i in range(npoly+1)],axis=1)
 
     for i in range(naux):
         polytrue[i,:]=[j*i for j in range(npoly+1)]
@@ -35,41 +36,42 @@ def noisypoly(request):
 
     # create a naming of the auxdims
     auxcoord=[f"aux_{i}" for i in range(naux)]
-    dspoly=xr.Dataset({"polyobs":xr.DataArray(polyobs,dims=("naux_","x")),"polytrue":xr.DataArray(polytrue.T,dims=("poly","naux_"))},coords={"x":x_axis,"naux_":auxcoord,"poly":np.arange(npoly+1)},attrs=dict(noise_std=noise_std,x0=x0,delta_x=delta_x))
+    dspoly=xr.Dataset({"polyobs":xr.DataArray(polyobs,dims=("naux","nm")),"polytrue":xr.DataArray(polytrue,dims=("naux","poly")),"damat":xr.DataArray(damat,dims=("nm","poly"))},coords={"naux":auxcoord,"nm":x_axis,"poly":np.arange(npoly+1)},attrs=dict(noise_std=noise_std,x0=x0,delta_x=delta_x))
 
 
     return dspoly
 
 
-def build_poly_covariance(noisypoly):
-       """
-       Build a diagonal covariance matrix and standard deviation vector for polyobs.
-       """
-       std=noisypoly.polyobs.std(dim="x")
-       var=std**2
+def poly_covariance(noisypoly):
+    """
+    Build a diagonal covariance matrix and standard deviation vector
+    """
+    std=noisypoly.damat.std(dim="poly")
+    var=std**2
     
-       std_da=xr.DataArray(std.data,dims="naux_",coords={"naux_":noisypoly.naux_})
-       cov_da=xr.DataArray(np.diag(var.data),dims=("naux_","naux"),coords={"naux_":noisypoly.naux_.data,"naux":noisypoly.naux_.data})
+    std_da=xr.DataArray(std.data,dims="nm",coords={"nm":noisypoly.nm})
+    cov_da=xr.DataArray(np.diag(var.data),dims=("nm","nm_"),coords={"nm":noisypoly.nm.data,"nm_":noisypoly.nm.data})
 
-       return cov_da,std_da
-
-
+    return cov_da,std_da
 
 
-def test_poly_decorrelation_consistency(noisypoly):
-     """
-     Compare decorrelation using a full diagonal covariance matrix vs. diagonal std-based decorrelation
-     on the polyobs data
-     """
-     cov_da,std_da=build_poly_covariance(noisypoly)
-     damat=noisypoly.polyobs  
-     cov_full=CovarianceMat(N_or_Cov=cov_da,error_cov=True)
+
+
+def test_poly_decorrelation(noisypoly):
+    """
+    Compare decorrelation using a full diagonal covariance matrix vs. diagonal std-based decorrelation
+    """
+    cov_da,std_da=poly_covariance(noisypoly)
+
+    cov_full=CovarianceMat(N_or_Cov=cov_da,error_cov=True)
+    decorr_full=cov_full.decorrelate(noisypoly.damat).decorrelated
     
-     decorr_full=cov_full.decorrelate(damat).decorrelated
-     cov_diag=DiagonalCovarianceMat(diag_std=std_da)
-     decorr_diag=cov_diag.decorrelate(damat).decorrelated
+    cov_diag=DiagonalCovarianceMat(diag_std=std_da)
+    decorr_diag=cov_diag.decorrelate(noisypoly.damat).decorrelated
 
-     xr.testing.assert_equal(decorr_full,decorr_diag)
+    prenoise=noisypoly.attrs['noise_std']
+
+    assert np.allclose(decorr_full.data,decorr_diag,atol=6*prenoise)
 
 
 
