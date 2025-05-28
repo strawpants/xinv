@@ -69,9 +69,8 @@ def test_poly_decorrelation(noisypoly):
     cov_diag=DiagonalCovarianceMat(diag_std=std_da)
     decorr_diag=cov_diag.decorrelate(noisypoly.damat).decorrelated
 
-    prenoise=noisypoly.attrs['noise_std']
 
-    assert np.allclose(decorr_full.data,decorr_diag,atol=6*prenoise)
+    assert np.allclose(decorr_full.data,decorr_diag,atol=1e-15)
 
 
 
