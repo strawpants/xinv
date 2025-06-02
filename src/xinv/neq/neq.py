@@ -270,46 +270,53 @@ def add(dsneq:xr.Dataset, dsneqother:xr.Dataset):
 
     
     return dsneq_merged                     
-
-
     
-def transform(dsneq:xr.Dataset, fwdoperator):
-    """ Transform the normal equation system using a forward operator matrix (e.g., the decorrelated jacobian matrix)"""
-    
-    # if not inplace:
-    #     # copy entire NEQ and operate on that one in place
-    #     dsneq=dsneq.copy(deep=True)
+
+def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray):
+    """ Transform a normal equation system using a forward operator"""
     
     N,rhs,ltpl,sigma0,nobs,npara=find_neq_components(dsneq)
-        
-    trns_param=fwdoperator.shape[0] #number of transformed parameters
-    
-    Nnew=np.zeros((trns_param,trns_param))
-    rhsnew=np.zeros((trns_param,1))
-    ltplnew=np.zeros((trns_param,))
-    
-    for i in range(prd):
-        Nnew[i]=dsyrk(1.0,fwdoperator[i],trans=1,lower=1)
-        rhsnew[i]=(fwdoperator.T@rhs).reshape(-1,1) # replace with xinv * later
-        ltplnew[i]=ltpl[i]  ## add an if condition for changing the ltpl if set_apriori changes
-        
-    
-    # from xinv.core.attrs import ltplnew_attrs,Nnew_attrs,rhsnew_attrs
-    # N.attrs.update(Nnew_attrs())
-    # ltpl.attrs.update(ltplnew_attrs())
-    # rhs.attrs.update(rhsnew_attrs())
+    unkdim=N.dims[0]
 
-    dsneq["N"]=Nnew
-    dsneq["rhs"]=rhsnew
-    dsneq["ltpl"]=ltplnew
-    
-#    dsneq=dsneq.rename(dict(N='Nnew',rhs='rhsnew',ltpl='ltplnew'))
-    
-    
-    if inplace:
-        return None
-    else:
-        return dsneq
+    if fwdoperator.dims[1] != unkdim:
+        raise ValueError("fwdoperator last dimension must match the unknown dimension")
 
+    newdim=fwdoperator.dims[0]
+    nnew=fwdoperator.sizes[newdim]
 
+    new_unk=xr.DataArray(np.arange(nnew),dims=newdim,name=unkdim)
+    new_unk.attrs.update(xunk_coords_attrs(state=xinv_st.linked))
 
+    coords=find_xinv_coords(dsneq,exclude=[xinv_tp.grp_id_co,xinv_tp.grp_seq_co])
+    coords[unkdim]=new_unk
+
+    dsneq_trans=xr.Dataset.xi.neqzeros(rhsdims=rhs.dims,coords=coords)
+    renamedict=dict(N=N.name,rhs=rhs.name,ltpl=ltpl.name,sigma0=sigma0.name,nobs=nobs.name,npara=npara.name)
+    dsneq_trans=dsneq_trans.rename(renamedict)
+
+    fwd_T=fwdoperator.transpose()
+    N1=xr.dot(N,fwdoperator,dim=unkdim)
+    N_transformed=xr.dot(fwd_T,N1,dim=unkdim)
+    rhs_transformed=xr.dot(fwd_T,rhs,dim=unkdim)
+   
+
+    dsneq_trans["N"]=N_transformed
+    dsneq_trans.N.attrs.update(N.attrs)
+
+    dsneq_trans["rhs"]=rhs_transformed
+    dsneq_trans.rhs.attrs.update(rhs.attrs)
+
+    dsneq_trans["ltpl"]=ltpl
+    dsneq_trans.ltpl.attrs.update(ltpl.attrs)
+
+    dsneq_trans["sigma0"]=sigma0
+    dsneq_trans.sigma0.attrs.update(sigma0.attrs)
+
+    dsneq_trans["nobs"]=nobs
+    dsneq_trans.nobs.attrs.update(nobs.attrs)
+
+    dsneq_trans["npara"]=xr.DataArray(nnew,name=npara.name)
+    dsneq_trans.npara.attrs.update(npara.attrs)
+
+    return dsneq_trans
+    
