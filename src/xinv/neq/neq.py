@@ -3,8 +3,9 @@
 
 
 from scipy.linalg import cholesky
-from scipy.linalg.blas import dtrsm, dsyrk # import dsyrk
+from scipy.linalg.blas import dtrsm
 from scipy.linalg.lapack import dpotri
+from scipy.linalg import cholesky
 from xinv.core.attrs import cov_attrs, find_component, find_xinv_coords,solest_attrs,ltpl_attrs,find_neq_components,sigma0_attrs,Chol_attrs,N_attrs,rhs_attrs,nobs_attrs,npara_attrs, xunk_coords_attrs,xinv_tp,xinv_st
 from xinv.core.grouping import find_group_coords,build_group_coord
 from xinv.core.exceptions import XinvIllposedError
@@ -272,36 +273,55 @@ def add(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     return dsneq_merged                     
     
 
-def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray):
+def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray,lower=True):
+    
     """ Transform a normal equation system using a forward operator"""
+
+    if dsneq.rhs.attrs["xinv_type"]=="aprioriVec":
+        dsneq.rhs.attrs.update(rhs_attrs())
+
+    if "sigma0" not in dsneq:
+        dsneq["sigma0"]=xr.DataArray(0.0)
+        dsneq.sigma0.attrs.update(sigma0_attrs())
     
     N,rhs,ltpl,sigma0,nobs,npara=find_neq_components(dsneq)
+    
     unkdim=N.dims[0]
 
-    if fwdoperator.dims[1] != unkdim:
+    if fwdoperator.dims[0] != unkdim:
         raise ValueError("fwdoperator last dimension must match the unknown dimension")
 
-    newdim=fwdoperator.dims[0]
+    rhs_transformed=xr.dot(fwdoperator.transpose(),rhs,dim=unkdim)
+
+    
+    Ncholesky=cholesky(N.data,lower=lower)
+    decorrfwdoperator=Ncholesky@fwdoperator.data
+    decorrfwdoperator=xr.DataArray(decorrfwdoperator,dims=fwdoperator.dims,coords=fwdoperator.coords)
+
+    N_transformed=decorrfwdoperator.transpose().data@decorrfwdoperator.data
+    
+    newdim=fwdoperator.dims[1]
     nnew=fwdoperator.sizes[newdim]
 
-    new_unk=xr.DataArray(np.arange(nnew),dims=newdim,name=unkdim)
+   # new_unk=xr.DataArray(np.arange(nnew),dims=newdim,name=newdim)
+    new_unk=fwdoperator.coords["xinv_unk"]   
+    #"xinv_unk_": fwdoperator.coords["xinv_unk"]
     new_unk.attrs.update(xunk_coords_attrs(state=xinv_st.linked))
+ 
+    #coords=dict(find_xinv_coords(dsneq,exclude=[xinv_tp.grp_id_co,xinv_tp.grp_seq_co]))
+    coords={newdim:new_unk}
+    
+    N_transformed=xr.DataArray(N_transformed,dims=(newdim,newdim+"_"),coords=coords)
 
-    coords=find_xinv_coords(dsneq,exclude=[xinv_tp.grp_id_co,xinv_tp.grp_seq_co])
-    coords[unkdim]=new_unk
+    #import pdb; pdb.set_trace()
 
-    dsneq_trans=xr.Dataset.xi.neqzeros(rhsdims=rhs.dims,coords=coords)
+
+    dsneq_trans=xr.Dataset.xi.neqzeros(rhsdims=rhs_transformed.dims,coords=coords,lower=lower)
     renamedict=dict(N=N.name,rhs=rhs.name,ltpl=ltpl.name,sigma0=sigma0.name,nobs=nobs.name,npara=npara.name)
     dsneq_trans=dsneq_trans.rename(renamedict)
-
-    fwd_T=fwdoperator.transpose()
-    N1=xr.dot(N,fwdoperator,dim=unkdim)
-    N_transformed=xr.dot(fwd_T,N1,dim=unkdim)
-    rhs_transformed=xr.dot(fwd_T,rhs,dim=unkdim)
-   
-
+    
     dsneq_trans["N"]=N_transformed
-    dsneq_trans.N.attrs.update(N.attrs)
+    dsneq_trans.N.attrs.update(Chol_attrs(lower=int(lower)))
 
     dsneq_trans["rhs"]=rhs_transformed
     dsneq_trans.rhs.attrs.update(rhs.attrs)
@@ -315,7 +335,7 @@ def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray):
     dsneq_trans["nobs"]=nobs
     dsneq_trans.nobs.attrs.update(nobs.attrs)
 
-    dsneq_trans["npara"]=xr.DataArray(nnew,name=npara.name)
+    dsneq_trans["npara"]=xr.DataArray(nnew)
     dsneq_trans.npara.attrs.update(npara.attrs)
 
     return dsneq_trans

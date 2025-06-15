@@ -43,7 +43,7 @@ def Chol_attrs(lower=0):
     if lower == 0:
         state=xinv_st.cholU
     else:
-        state=xinv_st.choL
+        state=xinv_st.cholL
     return xinv_attrs(xinv_tp.N,state,"Cholesky decomposition")
 
 def cov_attrs(lower=0):
