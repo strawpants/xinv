@@ -56,6 +56,10 @@ def solve(dsneq,inplace=False):
 
 
     N,rhs,ltpl,sigma0,nobs,npara=find_neq_components(dsneq)
+
+    b=rhs.copy(deep=True)
+
+    
     #decompose the normal matrix using cholesky in place
     if N.attrs['xinv_state'] == xinv_st.symU:
         lower=0
@@ -107,7 +111,7 @@ def solve(dsneq,inplace=False):
         
     #2. update ltpl
     
-    ltpl-=rhs.dot(rhs,dim=N.dims[0])
+    ltpl-=rhs.dot(b,dim=N.dims[0])
     ltpl.attrs.update(ltpl_attrs('posteriori'))
 
     #3 solve Ux=z for x
@@ -133,6 +137,7 @@ def solve(dsneq,inplace=False):
     N.attrs.update(cov_attrs()) 
 
     # compute posteriori sigma0
+    
     sigma0=np.sqrt(ltpl/(nobs-npara))
     sigma0.attrs.update(sigma0_attrs('posteriori'))
     dsneq['sigma0']=sigma0
@@ -273,7 +278,7 @@ def add(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     return dsneq_merged                     
     
 
-def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray,lower=True):
+def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray,lower=0):
     
     """ Transform a normal equation system using a forward operator"""
 
@@ -281,7 +286,7 @@ def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray,lower=True):
         dsneq.rhs.attrs.update(rhs_attrs())
 
     if "sigma0" not in dsneq:
-        dsneq["sigma0"]=xr.DataArray(0.0)
+        dsneq["sigma0"]=xr.DataArray(1.0)
         dsneq.sigma0.attrs.update(sigma0_attrs())
     
     N,rhs,ltpl,sigma0,nobs,npara=find_neq_components(dsneq)
@@ -314,14 +319,19 @@ def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray,lower=True):
     N_transformed=xr.DataArray(N_transformed,dims=(newdim,newdim+"_"),coords=coords)
 
     #import pdb; pdb.set_trace()
+    npara=xr.DataArray(nnew,attrs=npara_attrs(),name="npara")
+
+    sigma_trans=np.sqrt(ltpl/(nobs-npara.data))
+    sigma_trans.attrs.update(sigma0.attrs)
 
 
+    
     dsneq_trans=xr.Dataset.xi.neqzeros(rhsdims=rhs_transformed.dims,coords=coords,lower=lower)
     renamedict=dict(N=N.name,rhs=rhs.name,ltpl=ltpl.name,sigma0=sigma0.name,nobs=nobs.name,npara=npara.name)
     dsneq_trans=dsneq_trans.rename(renamedict)
     
     dsneq_trans["N"]=N_transformed
-    dsneq_trans.N.attrs.update(Chol_attrs(lower=int(lower)))
+    dsneq_trans.N.attrs.update(N_attrs(lower=lower))
 
     dsneq_trans["rhs"]=rhs_transformed
     dsneq_trans.rhs.attrs.update(rhs.attrs)
@@ -329,14 +339,20 @@ def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray,lower=True):
     dsneq_trans["ltpl"]=ltpl
     dsneq_trans.ltpl.attrs.update(ltpl.attrs)
 
-    dsneq_trans["sigma0"]=sigma0
-    dsneq_trans.sigma0.attrs.update(sigma0.attrs)
+    dsneq_trans["sigma0"]=sigma_trans
 
     dsneq_trans["nobs"]=nobs
     dsneq_trans.nobs.attrs.update(nobs.attrs)
 
-    dsneq_trans["npara"]=xr.DataArray(nnew)
+    dsneq_trans["npara"]=npara
     dsneq_trans.npara.attrs.update(npara.attrs)
 
     return dsneq_trans
+
+
+
+    
+
+
+    
     
