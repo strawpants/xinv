@@ -118,7 +118,7 @@ class SNXVEC(SNXBlock):
         elif blockname == "SOLUTION/NORMAL_EQUATION_VECTOR":
             self.vname="rhs"
             self.svname=None
-            self.vattrs=x0_attrs()
+            self.vattrs=rhs_attrs()
             self.svattrs={}
         elif blockname == "SOLUTION/ESTIMATE":
             self.vname="sol_est"
@@ -476,5 +476,8 @@ def read_sinex(file_or_obj,stopatmat=False):
     if needsClosing:
         file_or_obj.close()
 
+    if "sigma0" not in dsout:
+        dsout["sigma0"]=xr.DataArray(1.0)
+        dsout.sigma0.attrs.update(sigma0_attrs())
+
     return dsout 
-    

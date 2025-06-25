@@ -281,13 +281,6 @@ def add(dsneq:xr.Dataset, dsneqother:xr.Dataset):
 def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray,lower=0):
     
     """ Transform a normal equation system using a forward operator"""
-
-    if dsneq.rhs.attrs["xinv_type"]=="aprioriVec":
-        dsneq.rhs.attrs.update(rhs_attrs())
-
-    if "sigma0" not in dsneq:
-        dsneq["sigma0"]=xr.DataArray(1.0)
-        dsneq.sigma0.attrs.update(sigma0_attrs())
     
     N,rhs,ltpl,sigma0,nobs,npara=find_neq_components(dsneq)
     
@@ -296,10 +289,16 @@ def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray,lower=0):
     if fwdoperator.dims[0] != unkdim:
         raise ValueError("fwdoperator last dimension must match the unknown dimension")
 
+    #rhs_transformed=fwdoperator.transpose().dot(rhs,dim=unkdim)
     rhs_transformed=xr.dot(fwdoperator.transpose(),rhs,dim=unkdim)
 
-    
     Ncholesky=cholesky(N.data,lower=lower)
+
+
+   # import pdb; pdb.set_trace()
+   # if Ncholesky.dims[-1] != fwdoperator.dims[0]+"_":
+    #    raise ValueError("Ncholesky last dimension must match the fwdoperator first dimension")
+
     decorrfwdoperator=Ncholesky@fwdoperator.data
     decorrfwdoperator=xr.DataArray(decorrfwdoperator,dims=fwdoperator.dims,coords=fwdoperator.coords)
 
@@ -309,8 +308,9 @@ def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray,lower=0):
     nnew=fwdoperator.sizes[newdim]
 
    # new_unk=xr.DataArray(np.arange(nnew),dims=newdim,name=newdim)
+    
     new_unk=fwdoperator.coords["xinv_unk"]   
-    #"xinv_unk_": fwdoperator.coords["xinv_unk"]
+
     new_unk.attrs.update(xunk_coords_attrs(state=xinv_st.linked))
  
     #coords=dict(find_xinv_coords(dsneq,exclude=[xinv_tp.grp_id_co,xinv_tp.grp_seq_co]))
@@ -320,6 +320,7 @@ def transform(dsneq:xr.Dataset,fwdoperator:xr.DataArray,lower=0):
 
     #import pdb; pdb.set_trace()
     npara=xr.DataArray(nnew,attrs=npara_attrs(),name="npara")
+    #npara_trans.attrs.update(npara.attrs)
 
     sigma_trans=np.sqrt(ltpl/(nobs-npara.data))
     sigma_trans.attrs.update(sigma0.attrs)

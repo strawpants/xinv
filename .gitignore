@@ -8,6 +8,9 @@ _version.py
 
 # C extensions
 *.so
+src/extension/sinex.html
+src/extension/xiext.cpp
+src/extension/xiext.html
 
 # Distribution / packaging
 .Python
