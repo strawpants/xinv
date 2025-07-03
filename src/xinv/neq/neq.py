@@ -169,7 +169,6 @@ def set_apriori(dsneq:xr.Dataset, daapri:xr.DataArray, absolute=False, inplace=F
     
 >>>>>>> 66694e0 (Added transform function, updated fwdoperator interfacing, and more)
 
-    
 
 
     
