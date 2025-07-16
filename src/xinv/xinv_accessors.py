@@ -43,8 +43,13 @@ class InverseDsAccessor:
     def fix(self,idx):
         return neqfix(self._obj,idx) #remove parameters from the normal equation system
     
+<<<<<<< HEAD
     def set_apriori(self,dapri,absolute=False,inplace=False):
         return neqset_apriori(self._obj,dapri,absolute) #change apriori values
+=======
+    def set_apriori(self,dapri,damean,absolute=False):
+        return neqset_apriori(self._obj,dapri,damean,absolute) #change apriori values
+>>>>>>> e3ddba4 (add set_apriori routine for updating a priori in NEQs)
 
     def add(self,dsneqother):
         return neqadd(self._obj,dsneqother) #add/merge another normal equation system
