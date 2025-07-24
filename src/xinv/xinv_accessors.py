@@ -8,11 +8,9 @@ from xinv.neq import transform as neqtransform
 from xinv.neq import reduce as neqreduce
 from xinv.neq import fix as neqfix
 from xinv.neq import set_apriori as neqset_apriori
-from xinv.neq import neqadd
+from xinv.neq import add as neqadd
 from xinv.neq import zeros as neqzeros
 from xinv.core.grouping import get_group,reindex_groups,rename_groups
-
-from xinv.core.attrs import find_xinv_coords,xinv_tp,xinv_st
 
 @xr.register_dataarray_accessor("xi")
 class InverseDaAccessor:
@@ -31,8 +29,8 @@ class InverseDsAccessor:
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
     
-    def transform(self,fwdop,**kwargs):
-        return neqtransform(self._obj,fwdop,**kwargs) #transform the normal equation system using a forward operator
+    def transform(self,fwdop):
+        return neqtransform(self._obj,fwdop) 
     
     def solve(self,inplace=False):
         return neqsolve(self._obj,inplace) #solve the normal equation system
@@ -43,8 +41,8 @@ class InverseDsAccessor:
     def fix(self,idx):
         return neqfix(self._obj,idx) #remove parameters from the normal equation system
     
-    def set_apriori(self,dapri):
-        return neqset_apriori(self._obj,dapri) #change apriori values
+    def set_apriori(self,dapri,absolute=False,inplace=False):
+        return neqset_apriori(self._obj,dapri,absolute) #change apriori values
 
     def add(self,dsneqother):
         return neqadd(self._obj,dsneqother) #add/merge another normal equation system
@@ -63,19 +61,3 @@ class InverseDsAccessor:
     @staticmethod
     def neqzeros(rhsdims,coords,lower=0):
         return neqzeros(rhsdims=rhsdims,coords=coords,lower=lower)
-
-    def unknown_dim(self):
-        
-        """
-        Convenience function to retrieve the name of the currently linked unknown coordinate dimension
-        
-        Returns 
-        -------
-        str
-            The name of the currently linked unknown coordinate dimension
-        
-        """
-        xunk_co=find_xinv_coords(self._obj,include=[xinv_tp.unk_co],state=xinv_st.linked)
-        if len(xunk_co)!=1:
-            raise ValueError("No or ambiguous linked unknown coordinate found")
-        return next(iter(xunk_co.values())).dims[0]
