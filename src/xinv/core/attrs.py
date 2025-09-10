@@ -4,6 +4,7 @@
 
 # This file contains NEQ attributes of the xinv package and lookup methods to determine normal equation components
 from collections import namedtuple
+from xinv.core.logging import xinvlogger 
 
 #centrally define the xinv attributes
 _xinvtype=namedtuple("_xinvtype","unk_co aux_co grp_id_co grp_seq_co N COV rhs solest stdsolest x0 ltpl sigma0 nobs npara")
@@ -52,6 +53,16 @@ def cov_attrs(lower=0):
     else:
         state=xinv_st.symL
     return xinv_attrs(xinv_tp.COV,state,"Error Covariance matrix")
+
+def islower(mat):
+    """Determine if the xinv_type_str is a lower triangular matrix"""
+    state=mat.attrs['xinv_state']
+    if state == xinv_st.symL or state == xinv_st.cholL :
+        return 1
+    elif state == xinv_st.symU or state == xinv_st.cholU :
+        return 0
+    else:
+        raise ValueError(f"Unknown xinv state: {state}. Must be one of {xinv_st.symL}, {xinv_st.symU}, {xinv_st.cholL}, {xinv_st.cholU}")
 
 def ltpl_attrs(state=xinv_st.apri):
     return xinv_attrs(xinv_tp.ltpl,state,"Least squares cost function values")
@@ -102,13 +113,18 @@ def find_component(dsneq,component):
 def find_components(dsneq,components):
     out=[]
     for comp in components:
-        comp_=find_component(dsneq,comp)
+        try:
+            comp_=find_component(dsneq,comp)
+        except KeyError:
+            xinvlogger.warning(f"Cannot find {comp} component in NEQ dataset, setting to None")
+            comp_=None
+
         out.append(comp_)
     return out
 
 
 def find_neq_components(dsneq):
-    components=[xinv_tp.N,xinv_tp.rhs,xinv_tp.ltpl,xinv_tp.sigma0,xinv_tp.nobs,xinv_tp.npara]
+    components=[xinv_tp.N,xinv_tp.rhs,xinv_tp.x0,xinv_tp.ltpl,xinv_tp.sigma0,xinv_tp.nobs,xinv_tp.npara]
     return find_components(dsneq,components)
 
 def find_sol_components(dssol):
@@ -146,7 +162,33 @@ def get_xunk_size_coname(dsneq):
     xunkconame=next(iter(xunk_co))
     return dsneq.sizes[xunk_co[xunkconame].dims[0]],xunkconame
 
+def unlink(davar):
+    """
+    Unlink a variable by changing its state to unlinked
+    Parameters
+    ----------
+    davar : xarray.DataArray
+        The data array to unlink.
 
+    Returns
+    -------
+    None.
+    """
+    change_state(davar,xinv_st.unlinked)
+
+def link(davar):
+    """
+    Link a variable by changing its state to unlinked
+    Parameters
+    ----------
+    davar : xarray.DataArray
+        The data array to unlink.
+
+    Returns
+    -------
+    None.
+    """
+    change_state(davar,xinv_st.linked)
 
 def change_state(davar,state):
     """
