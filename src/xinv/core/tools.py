@@ -19,9 +19,13 @@ def find_overlap_coords(coord1,coord2):
 
     if unkdim1 != unkdim2:
         raise ValueError("Coordinates must have the same dimension name")
+<<<<<<< HEAD
     if coord1.dtype != coord2.dtype:
         raise ValueError(f"Coordinates must have the same types, supplied are coord1: {coord1.dtype},coord2: {coord2.dtype}")
 
+=======
+    
+>>>>>>> 66694e0 (Added transform function, updated fwdoperator interfacing, and more)
     intersect=np.intersect1d(coord1.data,coord2.data,return_indices=False)
     uniq1=np.setdiff1d(coord1, coord2, assume_unique=False)
     uniq2=np.setdiff1d(coord2, coord1, assume_unique=False)
