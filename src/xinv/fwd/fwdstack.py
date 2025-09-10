@@ -17,12 +17,12 @@ class FwdStackOp(FwdOpbase):
         else:
             self.append(fwdops)
 
-    def _jacobian_impl(self,dain):
+    def _jacobian_impl(self,**kwargs):
         """Creates the Jacobian of the forward operator"""
         jacobian=None
         for stack_id,fwdop in enumerate(self._fwdops):
             #get Jacobian and add a multindex holding its stackid
-            jacobian_i=fwdop.jacobian(dain)
+            jacobian_i=fwdop.jacobian(**kwargs)
             jacobian_i=expand_as_group(jacobian_i,group_dim=fwdop._unkdim,stack_dim=self._unkdim)
             if jacobian is None:
                 jacobian=jacobian_i

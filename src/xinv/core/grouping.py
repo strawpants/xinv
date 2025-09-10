@@ -2,7 +2,7 @@
 ## Copyright (c) 2025 Roelof Rietbroek, r.rietbroek@utwente.nl
 import numpy as np
 import xarray as xr
-from xinv.core.attrs import find_component, group_id_attrs, group_seq_attrs,find_xinv_coords, xunk_coords_attrs,xinv_tp,xinv_st
+from xinv.core.attrs import find_component, get_xunk_size_coname, group_id_attrs, group_seq_attrs,find_xinv_coords, xunk_coords_attrs,xinv_tp,xinv_st
 import pandas as pd
 from xinv.core.logging import xinvlogger
 
@@ -135,13 +135,17 @@ def get_group(dsneq,groupname):
     unkdim_=f"{unkdim}_"
 
     try:
-        find_component(dsneq,xinv_tp.N)
-        find_component(dsneq,xinv_tp.COV)
+        try:
+            find_component(dsneq,xinv_tp.N)
+        except KeyError:
+            #ok so try find a covariance matrix
+            find_component(dsneq,xinv_tp.COV)
         #extract the relevant subsections
         dsout=dsneq[{unkdim:grpidx.data,unkdim_:grpidx.data}] 
         rename={unkdim:groupname,unkdim_:groupname+"_"}
         hasmatrix=True
     except KeyError:
+        #neither N or COV was found
         dsout=dsneq[{unkdim:grpidx.data}] 
         rename={unkdim:groupname}
         hasmatrix=False
@@ -169,7 +173,7 @@ def get_group(dsneq,groupname):
         dsout=dsout.assign_coords({groupname:(groupname,groupcoord.data)})
     #possibly rebuild the multindex if the original group was a multindex
     #add xinv attributes
-    dsout[groupname].attrs.update(xunk_coords_attrs(state="linked"))
+    dsout[groupname].attrs.update(xunk_coords_attrs(state=xinv_st.linked))
 
     return dsout
 
@@ -230,3 +234,38 @@ def rename_groups(dsneq,grpmap):
 
 
     return reindex_groups(dsneq)
+
+
+def split_as_groups(dsneq,group_ids:xr.DataArray,stack_dim=None):
+    """
+    """
+    
+    unksz,unkdim=get_xunk_size_coname(dsneq)
+
+    if unksz != len(group_ids):
+        raise ValueError(f"Size of group_ids {len(group_ids)} does not match the size of the unknown dimension {unksz} in the dataset")
+
+    #make new groupcoordinates
+    grpseqtrack={grp:0 for grp in np.unique(group_ids.data)}
+    splitcoords={grp:[] for grp in grpseqtrack.keys()}
+    grpdata=[]
+    for idx,group_id in enumerate(group_ids.data):
+        iseq=grpseqtrack[group_id]
+        grpdata.append((group_id,iseq))  # sequence number is always 0 for now
+        #copy original coordinate value
+        splitcoords[group_id].append(dsneq[unkdim].data[idx])
+        grpseqtrack[group_id] += 1
+    
+    if stack_dim is None:
+        stack_dim= f"{unkdim}_spl"
+    groupco= build_group_coord(grpdata,dim=stack_dim)
+    
+    #setup new coordinates
+    attrs=xunk_coords_attrs(state=xinv_st.unlinked)
+    newcoords={grp:(grp,co,attrs) for grp,co in splitcoords.items()}
+    
+    dsneq=dsneq.drop_vars([unkdim]).rename({unkdim:stack_dim,f"{unkdim}_":f"{stack_dim}_"}).assign_coords(newcoords).assign_coords(groupco)
+
+    # breakpoint()
+
+    return dsneq

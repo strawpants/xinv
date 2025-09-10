@@ -4,12 +4,12 @@
 import numpy as np
 from scipy.linalg.blas import dsyrk
 import xarray as xr
-from xinv.core.attrs import rhs_attrs,N_attrs,ltpl_attrs,sigma0_attrs,nobs_attrs,npara_attrs,find_xinv_coords, xunk_coords_attrs,aux_coords_attrs
+from xinv.core.attrs import rhs_attrs,N_attrs,ltpl_attrs,sigma0_attrs,nobs_attrs,npara_attrs,find_xinv_coords, xunk_coords_attrs,aux_coords_attrs,x0_attrs
 
 
 
 class FwdOpbase:
-    def __init__(self,obs_dim=None,unknown_dim=None,cache=False,jacobname="jacobian"):
+    def __init__(self,obs_dim=None,unknown_dim=None,cache=False,jacobname="jacobian",**bindargs):
         self._obsdim=obs_dim
         self._unkdim=unknown_dim
         self._unkdim_t=unknown_dim+"_"
@@ -17,15 +17,33 @@ class FwdOpbase:
         self._cache_jacobian=cache
         self._jacob=None
         self._jacobname=jacobname
+        #to be forwarded to the jacobian implementation together with additional arguments
+        self._bindargs=bindargs
 
-    def jacobian(self,daobs=None): 
+    @property
+    def unkdim(self):
+        """Return the unknown dimension"""
+        return self._unkdim
+
+    @property
+    def obs_dim(self):
+        """Return the observation dimension"""
+        return self._obsdim
+
+
+    def jacobian(self,**kwargs): 
         """Create the Jacobian of the forward operator"""
-        if daobs is None and self._jacob is None:
-            raise ValueError("Requesting the Jacobian without arguments requires caching abilities of the forward operator")
-        elif daobs is None:
+        
+        #possibly quickly return the cached Jacobian
+        if self._jacob is not None and self._cache_jacobian:
             return self._jacob
 
-        jacob=self._jacobian_impl(daobs)
+        # if daobs is None and self._jacob is None:
+            # raise ValueError("Requesting the Jacobian without arguments requires caching abilities of the forward operator")
+        # elif daobs is None:
+            # return self._jacob
+
+        jacob=self._jacobian_impl(**self._bindargs,**kwargs)
         if type(jacob) == xr.DataArray:
             jacob.name=self._jacobname
             jacob=jacob.to_dataset()
@@ -45,8 +63,8 @@ class FwdOpbase:
         
 
         
-        #create a design matrix for the given observations
-        dsdesign=self.jacobian(daobs)
+        #create a design matrix for the given observations (note pass the observation data to the jacobian implementation, where it may or may not be used)
+        dsdesign=self.jacobian(daobs=daobs)
          
         dadesign=dsdesign[self._jacobname]
 
@@ -100,6 +118,10 @@ class FwdOpbase:
         #so make sure they are added
         for key,coord in xinvcoords.items():
             dsout[key].attrs.update(coord.attrs)
+        
+        #create an apriori solution (zero)
+        dsout['x0']=xr.zeros_like(dsout.rhs.reset_index(self._unkdim))
+        dsout.x0.attrs.update(x0_attrs())
 
         #add attributes
         dsout.N.attrs.update(N_attrs(lower))
@@ -110,6 +132,6 @@ class FwdOpbase:
         dsout.npara.attrs.update(npara_attrs())
         return dsout
     
-    def __call__(self,inpara):
+    def __call__(self,inpara,**kwargs):
         """Apply the forward operator"""
-        return self.jacobian()[self._jacobname]@inpara
+        return self.jacobian(**kwargs)[self._jacobname]@inpara
