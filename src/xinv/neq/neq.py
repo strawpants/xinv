@@ -27,7 +27,7 @@ def zeros(rhsdims,coords,lower=0,norder='C'):
             #Note: We assume that the first dimension is the unknown parameter dimension
             if i== 0 and not "xinv_type" in co.attrs:
                 xinvlogger.warning(f"Unknown parameter dimension is assumed to be the first one {rhsdims[0]}")
-            elif co.attrs["xinv_type"] != xinv_tp.unk_co:
+            elif i==0 and co.attrs["xinv_type"] != xinv_tp.unk_co:
                 raise ValueError("The unknown parameter does not correspond to the first dimenion of the right hand side")
             rhsshape.append(len(co))
 
