@@ -10,20 +10,7 @@ import os
 from xinv.core.tools import find_ilocs
 from xinv.core.attrs import find_xinv_coords,xinv_tp,xinv_st
 
-@pytest.fixture
-def neqbase(request):
-    """
-    load a normal equation system from file 
-    """
-    if request.param=='simple':
-        #simple normal equation system
-        neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_simple.nc')
-        dsneq=xr.open_dataset(neqfile1)
-    else:
-        neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly.nc')
-        dsneq=xr.open_dataset(neqfile1).xi.reindex_groups()
-    
-    return dsneq
+from fixtures import neqbase
 
 @pytest.mark.parametrize("neqbase",["simple","stacked"],indirect=True)
 @pytest.mark.parametrize("auxdim",["allaux","aux_0"])

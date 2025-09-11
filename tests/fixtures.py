@@ -7,6 +7,8 @@
 import pytest
 import numpy as np
 import xarray as xr
+import os
+import xinv 
 
 # we fix the seed for the noise generator below to make it noisy but reproducible
 rg=np.random.default_rng(12789)
@@ -41,3 +43,17 @@ def noisypoly(request):
     return dspoly
 
 
+@pytest.fixture
+def neqbase(request):
+    """
+    Load a normal equation system from file 
+    """
+    if request.param=='simple':
+        #simple normal equation system
+        neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_simple.nc')
+        dsneq=xr.load_dataset(neqfile1)
+    else:
+        neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly.nc')
+        dsneq=xr.load_dataset(neqfile1).xi.reindex_groups()
+    
+    return dsneq

@@ -154,6 +154,38 @@ def find_xinv_coords(dsneq,exclude=None,include=None,state=None):
 
     return xinvcoords
 
+def find_xinv_unk_coord(dsneq):
+
+    xunk_co=find_xinv_coords(dsneq,include=[xinv_tp.unk_co],state=xinv_st.linked)
+    if len(xunk_co)> 1:
+        raise ValueError("Ambiguous linked unknown coordinate found")
+    return next(iter(xunk_co.values()))
+
+def find_xinv_group_coords(dsneq):
+    """
+    Find the linked group id and sequence coordinates in a xinv dataset
+
+    Parameters
+    ----------
+    dsneq : xarray.Dataset
+        The dataset to search in
+    Returns
+    -------
+    group_id_co,group_seq_co : xarray.DataArray
+        The group id and sequence coordinates, or None if not found
+    """
+
+    grp_co=find_xinv_coords(dsneq,include=[xinv_tp.grp_id_co,xinv_tp.grp_seq_co],state=xinv_st.linked)
+    grpid_co=None
+    grpseq_co=None
+    for ky,co in grp_co.items():
+        if co.attrs['xinv_type'] == xinv_tp.grp_id_co:
+            grpid_co=co
+        elif co.attrs['xinv_type'] == xinv_tp.grp_seq_co:
+            grpseq_co=co
+
+    return grpid_co,grpseq_co
+
 
 def get_xunk_size_coname(dsneq):
     """Retrieve the size and name of the currently linked unknown coordinate
@@ -206,3 +238,40 @@ def change_state(davar,state):
     """
     if "xinv_state" in davar.attrs:
         davar.attrs["xinv_state"]=state
+
+
+def get_state(davar):
+    """
+    Get the state of a coordinate variable
+    Parameters
+    ----------
+    davar : xarray.DataArray
+        The data array to get the state of.
+
+    Returns
+    -------
+    xinv_st
+        The state of the data array.
+    """
+    if "xinv_state" in davar.attrs:
+        return davar.attrs["xinv_state"]
+    else:
+        raise ValueError("No xinv_state attribute found")
+
+def get_type(davar):
+    """
+    Get the type of a coordinate variable
+    Parameters
+    ----------
+    davar : xarray.DataArray
+        The data array to get the state of.
+
+    Returns
+    -------
+    xinv_st
+        The state of the data array.
+    """
+    if "xinv_type" in davar.attrs:
+        return davar.attrs["xinv_type"]
+    else:
+        raise ValueError("No xinv_type attribute found")
