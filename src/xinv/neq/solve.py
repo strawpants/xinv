@@ -9,7 +9,9 @@ from scipy.linalg.blas import dtrsm
 from scipy.linalg.lapack import dpotri
 from xinv.core.exceptions import XinvIllposedError
 
-from xinv.core.attrs import cov_attrs, solest_attrs,ltpl_attrs,find_neq_components,sigma0_attrs,Chol_attrs,xinv_st
+from xinv.core.attrs import cov_attrs, solest_attrs,ltpl_attrs,find_neq_components,sigma0_attrs,Chol_attrs,xinv_st,islower
+
+from xinv.linalg.inplace import cholesky_inplace, dpotri_inplace,dtrsm_inplace
 
 def solve(dsneq,inplace=False):
     """Solve the normal equation system using Cholesky factorization"""
@@ -22,72 +24,19 @@ def solve(dsneq,inplace=False):
     N,rhs,x0,ltpl,sigma0,nobs,npara=find_neq_components(dsneq)
 
     b=rhs.copy(deep=True)
-
     
-    #decompose the normal matrix using cholesky in place
-    if N.attrs['xinv_state'] == xinv_st.symU:
-        lower=0
-    elif N.attrs['xinv_state'] == xinv_st.symL:
-        lower=1
-    else:
-        raise RuntimeError(f"Don't know (yet) how to cope with normal matrix state:{N.attrs['xinv_state']}")
-
-    #check for C or F ordering
-    if N.data.flags['F_CONTIGUOUS'] and N.data.strides[0] == 8:
-        #fine F ordered array with stride 1 of double values
-        lowapparent=lower
-    elif N.data.flags['C_CONTIGUOUS'] and N.data.strides[1] == 8:
-        #switch lower/upper representation in the F-ordered matrix of doubl
-        lowapparent=1-lower
-    else:
-        raise RuntimeError("Normal matrix is not C or F contiguous")
-    try:
-        origmem=N.data.data
-        if lowapparent != lower:
-            cholesky(N.data.T,lower=lowapparent,overwrite_a=1)
-        else:
-            cholesky(N.data,lower=lowapparent,overwrite_a=1)
-    except np.linalg.LinAlgError as e:
-        raise XinvIllposedError(str(e))
-    N.attrs.update(Chol_attrs(lower))
+    #decompose the normal matrix using cholesky in place N -> U'U or LL'
+    cholesky_inplace(N)
+    
+    
     #Solve the system in several steps
     #1. triangular solve U'z=rhs for z (U' is now the Cholesky factor of N)
-    #dtrsm(alpha, a, b[, side, lower, trans_a, diag, overwrite_b]) 
-    #breakpoint()
-    
-    if rhs.data.flags['F_CONTIGUOUS'] and rhs.data.strides[0] ==8:
-        rhs_is_c_cont=1
-    elif rhs.data.flags['C_CONTIGUOUS'] and rhs.data.strides[1] == 8:
-        rhs_is_c_cont=0
-    else:
-        raise RuntimeError("Right hand side matrix is not C or F contiguous")
-
-    
-    if rhs_is_c_cont:
-        transa=1
-        side=0 #0 means left
-    
-        dtrsm(1.0,N.data,rhs.data,side=side,lower=lower,trans_a=transa,overwrite_b=1)
-    else:
-        #rhs is F contigious
-        transa=0
-        side=1 #0 means left  
-        dtrsm(1.0,N.data,rhs.data.T,side=side,lower=lower,trans_a=transa,overwrite_b=1)
-
-        
+   
+    dtrsm_inplace(N,rhs,trans=1)
 
     #2 solve Ux=z for x
     
-    
-    #call dtrsv('U','N','N',n1,C,n1,d,1) !d is updated again
-    if rhs_is_c_cont:
-        transa=0
-        side=0 #0 means left
-        dtrsm(1.0,N.data,rhs.data,side=side,lower=lower,trans_a=transa,overwrite_b=1)
-    else:
-        transa=1
-        side=1 #0 means left
-        dtrsm(1.0,N.data,rhs.data.T,side=side,lower=lower,trans_a=transa,overwrite_b=1)
+    dtrsm_inplace(N,rhs)
     
     #3. update ltpl
     ltpl-=rhs.dot(b,dim=N.dims[0])
@@ -99,11 +48,7 @@ def solve(dsneq,inplace=False):
 
     #4 compute error-covariance 
     # call dpotri('U',n1,C,n1,info)
-    if lowapparent != lower:
-        dpotri(N.data.T,lower=lowapparent,overwrite_c=1)
-    else:
-        dpotri(N.data,lower=lowapparent,overwrite_c=1)
-    N.attrs.update(cov_attrs()) 
+    dpotri_inplace(N)
     # compute posteriori sigma0
     
     sigma0=np.sqrt(ltpl/(nobs-npara))
