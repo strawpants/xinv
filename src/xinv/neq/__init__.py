@@ -3,3 +3,6 @@ from .transform import *
 from .solve import *
 from .add import *
 from .reduce import *
+from .set_apriori import *
+from .fix import *
+

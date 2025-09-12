@@ -7,7 +7,7 @@ from xinv.neq import solve as neqsolve
 from xinv.neq import transform as neqtransform
 from xinv.neq import groupreduce,reduce,ireduce
 
-from xinv.neq import fix as neqfix
+from xinv.neq import fix,ifix,groupfix
 from xinv.neq import set_apriori as neqset_apriori
 from xinv.neq import neqadd
 from xinv.neq import zeros as neqzeros
@@ -47,11 +47,18 @@ class InverseDsAccessor:
     def groupreduce(self,groupname,keep=False):
         return groupreduce(self._obj,groupname,keep=keep) #reduce  parameters by groupname index
     
-    def fix(self,idx):
-        return neqfix(self._obj,idx) #remove parameters from the normal equation system
+    def fix(self,keep=False,**kwargs):
+        return fix(self._obj,keep=False,**kwargs) #remove parameters from the normal equation system (fix them to their current apriori values)
     
-    def set_apriori(self,dapri,absolute=False,inplace=False):
-        return neqset_apriori(self._obj,dapri) #change apriori values
+    def ifix(self,idx,keep=False):
+        """fix by index"""
+        return ifix(self._obj,idx=idx,keep=keep) #remove parameters from the normal equation system (fix them to their current apriori values)
+    
+    def groupfix(self,groupname,keep=False):
+        return groupfix(self._obj,groupname,keep=keep)
+
+    def set_x0(self,dax0,is_delta=False,inplace=False):
+        return neqset_apriori(self._obj,dax0,is_delta,inplace) #change apriori values
 
     def add(self,dsneqother):
         return neqadd(self._obj,dsneqother) #add/merge another normal equation system

@@ -59,17 +59,6 @@ def zeros(rhsdims,coords,lower=0,norder='C'):
 
 
     
-def reduce(dsneq:xr.Dataset, idx):
-    #tbd reduce (implicitly solve) variables from a normal equation system spanned by idx
-    raise NotImplementedError("Reduce operation not yet implemented")
-
-def fix(dsneq:xr.Dataset, idx):
-    #tbd fix and (remove) solve) variables from a normal equation system spanned by idx
-    raise NotImplementedError("Fix operation not yet implemented")
-
-def set_apriori(dsneq:xr.Dataset, daapri:xr.DataArray):
-    #tbd set/change apriori values in a normal equation system
-    raise NotImplementedError("Set apriori values not yet implemented")
 
 
     

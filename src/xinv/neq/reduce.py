@@ -4,7 +4,7 @@
 
 from xinv.core.attrs import find_xinv_unk_coord,find_neq_components,islower,xinv_st,get_state,get_type,xinv_tp,find_xinv_group_coords,get_xunk_size_coname
 
-from xinv.core.tools import find_overlap_coords,find_ilocs
+from xinv.core.tools import find_overlap_coords,find_ilocs,find_unk_idx
 import numpy as np
 import xarray as xr
 from xinv.core.logging import xinvlogger
@@ -128,59 +128,18 @@ def reduce(dsneq, keep=False,**kwargs):
 
     """
     
+    idxfound,idxremaining,idxnotfound=find_unk_idx(dsneq,**kwargs)
+    if idxnotfound is not None:
+        xinvlogger.warning(f"Reduction parameters contain values {idxnotfound} which are not found in the input normal equation system, ignoring those")
 
-    xunk_co=find_xinv_unk_coord(dsneq)
-    
-    unkdim=xunk_co.dims[0]
-    
-    group_id_co=None
-    group_seq_co=None
-
-    reduniq=[]
-    common=[]
-    neuniq=[]
-    for coname,redparams in kwargs.items():
-        co_search=dsneq[coname]
-        if get_type(co_search) != xinv_tp.unk_co:
-            raise ValueError(f"Missing xinv_type: Reduction coordinate {coname} has no valid relation with unknown coordinate {xunk_co.name}")
-        dimname=co_search.dims[0]
-        if redparams is not type(xr.DataArray):
-            #turn into DataArray
-            redparams=xr.DataArray(redparams,dims=dimname)
-        #find unique and overlapping coordinates over the unknown dimension
-        redu,com,neun=find_overlap_coords(redparams,co_search)
-       
-        if get_state(co_search) == xinv_st.unlinked:
-            #we may have to apply an additional lookup in the group unknown multiindex
-            if group_id_co is None and group_seq_co is None:
-                group_id_co,group_seq_co=find_xinv_group_coords(dsneq)
-            common.extend([(coname,i) for i in find_ilocs(dsneq,coname,com)])
-            reduniq.extend([(coname,i) for i in find_ilocs(dsneq,coname,redu)])
-            neuniq.extend([(coname,i) for i in find_ilocs(dsneq,coname,neun)])
-
-        elif get_state(co_search) == xinv_st.linked:
-            reduniq.extend(redu)
-            common.extend(com)
-            neuniq.extend(neun)
-        else:
-            raise ValueError(f"Reduction coordinate {coname} has no valid link state")
-    
-    
-    
-    if len(reduniq) > 0:
-        xinvlogger.warning(f"Reduction parameters contain values {reduniq} which are not found in the input normal equation system, ignoring those")
-
-    if len(neuniq) == 0:
-        raise ValueError("Reduction parameters contain all unknown parameters, cannot reduce all unknowns")
-    
-    if len(common) == 0:
+    if (not keep and idxremaining is None) or (keep and idxfound is None):
         xinvlogger.warning("Nothing to reduce, returning input")
         return dsneq
-
-    #index vector of the to be reduced parameters
-    idxreduce=find_ilocs(dsneq,unkdim,common)
+    elif (not keep and idxfound is None) or (keep and idxremaining is None):
+        #cannot reduce all unknowns
+        raise ValueError("Reduction parameters contain all unknown parameters, cannot reduce all unknowns")
     
-    return ireduce(dsneq,idxreduce,keep)
+    return ireduce(dsneq,idxfound,keep)
 
 def groupreduce(dsneq,groupname,keep=False):
     """

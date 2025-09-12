@@ -9,9 +9,9 @@ from xinv.core.exceptions import XinvIllposedError
 
 from scipy.linalg import cholesky
 from scipy.linalg.lapack import dpotri
-from scipy.linalg.blas import dtrsm,dsyrk
+from scipy.linalg.blas import dtrsm,dsyrk,dsymm
 
-
+import ctypes
 from enum import Enum
 
 class MemLayout(Enum):
@@ -184,3 +184,71 @@ def dsyrk_inplace(N,A,trans=0,beta=0.0,alpha=1.0):
         A[()]=adat
 
     return N
+
+def dsymm_inplace(A:xr.DataArray,B:xr.DataArray,C:xr.DataArray,alpha=1.0,beta=0.0):
+    """
+    Symmetric matrix times matrix multiplication
+        C= alpha*A*B +beta*C
+    """
+    #
+    #    C := alpha*A*B + beta*C, (side=0)
+    #or
+    #    C := alpha*B*A + beta*C, (side=1)
+    
+
+    #some basic checks
+    if A.shape[0] != A.shape[1]:
+        raise ValueError("Matrix A must be square")
+    if A.shape[1] != B.shape[0]:
+        raise ValueError("Inner dimensions of A and B do not match")
+    if A.shape[0] != C.shape[0]:
+        raise ValueError("Output matrix C rows do not match matrix A")
+    if B.shape[1] != C.shape[1]:
+        raise ValueError("Columns of C  do not match that of B")
+    
+    
+
+    restore=False
+    c_layout=memlayout(C.data)
+    
+    if c_layout == MemLayout.F_cont:
+        cdat=C.data
+        side=0 #0 means left
+    elif c_layout == MemLayout.C_cont:
+        cdat=C.data.T
+        #switch side to allow for in place operation
+        side=1
+    else:
+        xinvlogger.warning("C matrix is not C or F contiguous, applying copy and restore")
+        cdat=C.data.copy(order='F')
+        side=0 #0 means left  
+        restore=True
+
+    lower=islower(A)
+    A_layout=memlayout(A.data)
+    if A_layout == MemLayout.C_cont:
+        #To prevent an additional copy by f2py we can fake a F contigous array by transposing and switching lower/upper
+        lower=1-lower
+        adat=A.data.T
+    else:
+        adat=A.data
+    
+    
+    if side == 1:
+        bdat=B.data.T
+    else:
+        bdat=B.data
+    
+    b_layout=memlayout(B.data)
+    
+
+    if b_layout != c_layout:
+        xinvlogger.warning("B matrix contiguousness is inconsistent with C, a copy will be made by f2py")
+    #dsymm(alpha, a, b[, beta, c, side, lower, overwrite_c])
+    dsymm(alpha,adat,bdat,beta=beta,c=cdat,side=side,lower=lower,overwrite_c=1)
+
+
+    if restore:    
+        C.data[()]=cdat
+
+    return C #although changed in place
