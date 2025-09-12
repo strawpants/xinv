@@ -72,7 +72,5 @@ def set_apriori(dsneq:xr.Dataset, daapri:xr.DataArray):
     raise NotImplementedError("Set apriori values not yet implemented")
 
 
-
-
     
     

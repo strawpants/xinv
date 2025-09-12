@@ -44,7 +44,7 @@ class InverseDsAccessor:
         return neqfix(self._obj,idx) #remove parameters from the normal equation system
     
     def set_apriori(self,dapri,absolute=False,inplace=False):
-        return neqset_apriori(self._obj,dapri,absolute) #change apriori values
+        return neqset_apriori(self._obj,dapri) #change apriori values
 
     def add(self,dsneqother):
         return neqadd(self._obj,dsneqother) #add/merge another normal equation system
