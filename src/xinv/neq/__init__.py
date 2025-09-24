@@ -3,6 +3,6 @@ from .transform import *
 from .solve import *
 from .add import *
 from .reduce import *
-from .set_apriori import *
+from .set_x0 import *
 from .fix import *
 

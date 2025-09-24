@@ -7,7 +7,7 @@ from xinv.core.attrs import find_neq_components,x0_attrs
 from xinv.core.tools import find_ilocs
 from xinv.linalg.inplace import dsymm_inplace
 
-def set_apriori(dsneq:xr.Dataset, daapri:xr.DataArray, apriori_is_delta=False, inplace=False):
+def set_x0(dsneq:xr.Dataset, daapri:xr.DataArray, apriori_is_delta=False, inplace=False):
     """ Change apriori values in a normal equation system """
 
     if not inplace:

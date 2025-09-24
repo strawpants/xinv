@@ -8,7 +8,7 @@ from xinv.neq import transform as neqtransform
 from xinv.neq import groupreduce,reduce,ireduce
 
 from xinv.neq import fix,ifix,groupfix
-from xinv.neq import set_apriori as neqset_apriori
+from xinv.neq import set_x0 as neqset_x0
 from xinv.neq import neqadd
 from xinv.neq import zeros as neqzeros
 from xinv.neq.build import build_normal as neqbuild_normal
@@ -58,7 +58,7 @@ class InverseDsAccessor:
         return groupfix(self._obj,groupname,keep=keep)
 
     def set_x0(self,dax0,is_delta=False,inplace=False):
-        return neqset_apriori(self._obj,dax0,is_delta,inplace) #change apriori values
+        return neqset_x0(self._obj,dax0,is_delta,inplace) #change apriori values
 
     def add(self,dsneqother):
         return neqadd(self._obj,dsneqother) #add/merge another normal equation system

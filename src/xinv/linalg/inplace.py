@@ -195,7 +195,6 @@ def dsymm_inplace(A:xr.DataArray,B:xr.DataArray,C:xr.DataArray,alpha=1.0,beta=0.
     #or
     #    C := alpha*B*A + beta*C, (side=1)
     
-
     #some basic checks
     if A.shape[0] != A.shape[1]:
         raise ValueError("Matrix A must be square")
@@ -203,9 +202,19 @@ def dsymm_inplace(A:xr.DataArray,B:xr.DataArray,C:xr.DataArray,alpha=1.0,beta=0.
         raise ValueError("Inner dimensions of A and B do not match")
     if A.shape[0] != C.shape[0]:
         raise ValueError("Output matrix C rows do not match matrix A")
-    if B.shape[1] != C.shape[1]:
-        raise ValueError("Columns of C  do not match that of B")
     
+    if B.ndim != C.ndim:
+        raise ValueError("B and C must have the same number of dimensions")
+
+    for i in range(B.ndim-1):
+        if B.shape[i] != C.shape[i]:
+            raise ValueError(f"Dimensions of C  do not match that of B at axis {i}")
+    # if B.ndim == 2 and C.ndim == 2:
+        # if B.shape[1] != C.shape[1]:
+            # raise ValueError("Columns of C  do not match that of B")
+    # elif B.ndim ==1 and C.ndim ==1:
+        # if B.shape[0] != C.shape[0]:
+            # raise ValueError("Dimensions of C  do not match that of B")
     
 
     restore=False

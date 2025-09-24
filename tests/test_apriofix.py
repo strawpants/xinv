@@ -64,6 +64,52 @@ def test_aprifix(neqbase,keep):
 
 
 
+@pytest.mark.parametrize("neqbase",["simple"],indirect=True)
+def test_aprifix_singlerhs(neqbase):
+    """
+    Test the apriori setting and removal of a set of unknown parameters from a neq system (single dimension rhs version) 
+    """
+    
+    #only select one single rhs
+    neqbase=neqbase.sel(naux='aux_1')
+
+
+    
+    #compute the overall solution
+    dssol=neqbase.xi.solve()
+
+    #get the index vector corresponding to some polynomials to fix (or keep)
+
+    fixpolyparam=[1,2]
+    idxfix,idxremain,_=find_unk_idx(dssol,poly=fixpolyparam)
+
+    unkdim=dssol.xi.unknown_dim()
+
+    dsneq_apriset=neqbase.xi.set_x0(dssol.solution[{unkdim:idxfix}])
+    
+
+    dssolapr=dsneq_apriset.xi.solve()
+
+    #check if x0+solution is the same as the overall solution
+
+
+    #solution should be the same on the non-reduced neq system
+    assert np.allclose(dssolapr.solution+dssolapr.x0,dssol.solution)
+
+    assert np.allclose(dssolapr.COV,dssol.COV)
+    assert np.allclose(dssolapr.ltpl,dssol.ltpl)
+    assert np.allclose(dssolapr.sigma0,dssol.sigma0)
+
+    # #fix the relevant parameters to their apriori values
+    dsneq_aprifix=dsneq_apriset.xi.fix(poly=fixpolyparam)
+    
+    dssolfix=dsneq_aprifix.xi.solve()
+    dssolsub=dssol.isel({unkdim:idxremain,unkdim+"_":idxremain})
+    soldif=np.abs(dssolfix.solution+dssolfix.x0-dssolsub.solution)
+    # stddev=xr.DataArray(np.sqrt(np.diag(dssolfix.COV)),dims=unkdim,coords={unkdim:dssolfix[unkdim]})*dssolfix.sigma0
+    
+    assert np.all(soldif < 1e-10)
+
     
 
 @pytest.mark.parametrize("neqbase",["stacked"],indirect=True)
