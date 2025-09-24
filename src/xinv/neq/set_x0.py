@@ -6,24 +6,45 @@ import xarray as xr
 from xinv.core.attrs import find_neq_components,x0_attrs
 from xinv.core.tools import find_ilocs
 from xinv.linalg.inplace import dsymm_inplace
+from xinv.core.logging import xinvlogger
 
-def set_x0(dsneq:xr.Dataset, daapri:xr.DataArray, apriori_is_delta=False, inplace=False):
+def set_x0(dsneqin:xr.Dataset, daapri:xr.DataArray, apriori_is_delta=False, inplace=False):
     """ Change apriori values in a normal equation system """
-
-    if not inplace:
-    #copy entire NEQ and operate on that one in place
-        dsneq=dsneq.copy(deep=True)
-
+    if inplace:  
+        dsneq=dsneqin.copy()
+    else:
+        #note: xarray deep copy does really always do a deep copy of the underlying data (e.g. numpy ndarrays)
+        dsneq=dsneqin.copy(deep=True)
+    
+    
+    
     #note prefix io_ denotes used for in and output, i_ is used for input only
     i_N,io_rhs,io_x0,io_ltpl,_,_,_=find_neq_components(dsneq)
     
     unkdim=dsneq.xi.unknown_dim()
-
+    
     if io_x0 is None:
         #create a new  x0 entry
         dsneq['x0']=xr.zeros_like(io_rhs.reset_index(unkdim))
         dsneq.x0.attrs=x0_attrs()
         io_x0=dsneq.x0
+    
+    if not inplace:
+        #todo: handle non-ndarrays here (e.g. dask,or sparse arrays)
+        #copy data explicitly (xarray deep copy does not always seem to work as expected)
+        #breakpoint() 
+        io_rhs.data=io_rhs.data.copy(order='F')
+        #link back to output neq
+        dsneq[io_rhs.name]=io_rhs
+        
+        #io_x0.data=io_x0.data.copy(order='F')
+        #dsneq[io_x0.name]=io_x0
+
+        #io_ltpl.data=io_ltpl.data.copy()
+
+    #import ipdb;ipdb.set_trace()
+
+
 
     #find the indices of the apriori values in the unknown vector
     idxapri=find_ilocs(dsneq,unkdim,daapri.coords[unkdim])
@@ -43,10 +64,9 @@ def set_x0(dsneq:xr.Dataset, daapri:xr.DataArray, apriori_is_delta=False, inplac
     # (1) first update to ltpl
     io_ltpl[()]-=deltax0.dot(io_rhs,dim=unkdim)
     
-
     # (2) update right hand side with symmetric matrix multiplication
     dsymm_inplace(A=i_N,B=deltax0,C=io_rhs,alpha=-1.0,beta=1.0)
-    
+    #ipdb.set_trace()
     # (3) update ltpl again
     io_ltpl[()]-=deltax0.dot(io_rhs,dim=unkdim)
     

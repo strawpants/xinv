@@ -26,16 +26,14 @@ def test_aprifix(neqbase,keep):
 
     fixpolyparam=[1,2]
     idxfix,idxremain,_=find_unk_idx(dssol,poly=fixpolyparam)
-
     unkdim=dssol.xi.unknown_dim()
-
     #set the apriori values of the unknown parameters to that from the overall solution
     if keep:
-        dsneq_apriset=neqbase.xi.set_x0(dssol.solution[{unkdim:idxremain}])
+        dsneq_apriset=neqbase.xi.set_x0(dssol.solution[{unkdim:idxremain}],inplace=False)
     else:
-        dsneq_apriset=neqbase.xi.set_x0(dssol.solution[{unkdim:idxfix}])
+        dsneq_apriset=neqbase.xi.set_x0(dssol.solution[{unkdim:idxfix}],inplace=False)
     
-
+    
     dssolapr=dsneq_apriset.xi.solve()
 
     #check if x0+solution is the same as the overall solution
