@@ -5,12 +5,14 @@ import xarray as xr
 import numpy as np
 from xinv.fwd import FwdOpbase
 from xinv.core.grouping import expand_as_group
+from xinv.core.attrs import find_xinv_unk_coord,xunk_coords_attrs,xinv_st
 
 class FwdStackOp(FwdOpbase):
-    def __init__(self,fwdops=None,cache=False,unknown_dim="xinv_unk"):
+    def __init__(self,fwdops=None,cache=False,align_coords=False,unknown_dim="xinv_unk"):
         """Setup a forward operator which consists of stacking several other forward operators as groups which share the observation dimension"""
         super().__init__(cache=cache,unknown_dim=unknown_dim)
         self._fwdops=[]
+        self._align_coords=align_coords
         if hasattr(fwdops,'__iter__'):
             for fwdop in fwdops:
                 self.append(fwdop)
@@ -22,13 +24,21 @@ class FwdStackOp(FwdOpbase):
         jacobian=None
         for stack_id,fwdop in enumerate(self._fwdops):
             #get Jacobian and add a multindex holding its stackid
-            jacobian_i=fwdop.jacobian(**kwargs)
+            jacobian_i=fwdop.jacobian(**kwargs) 
+            unk_coord=find_xinv_unk_coord(jacobian_i).name
             jacobian_i=expand_as_group(jacobian_i,group_dim=fwdop._unkdim,stack_dim=self._unkdim)
+            
             if jacobian is None:
                 jacobian=jacobian_i
             else:
-                #Not really memory friendly at the moment, but ok for now
-                jacobian=xr.concat([jacobian,jacobian_i],dim=self._unkdim)
+                if self._align_coords:
+                    coords=np.concatenate([jacobian[unk_coord].data,jacobian_i[unk_coord].data])
+                    jacobian=xr.concat([jacobian,jacobian_i],dim=self._unkdim)
+                    jacobian=jacobian.assign_coords({unk_coord:coords})
+                    jacobian[unk_coord].attrs.update(xunk_coords_attrs(state=xinv_st.linked))  ## replace unk_coord with the self._unkdim
+                else:
+                    #Not really memory friendly at the moment, but ok for now
+                    jacobian=xr.concat([jacobian,jacobian_i],dim=self._unkdim)
         return jacobian
 
     def append(self,fwdop):
