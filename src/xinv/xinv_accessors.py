@@ -66,11 +66,11 @@ class InverseDsAccessor:
     def get_group(self,group_name):
         return get_group(self._obj,group_name)
 
-    def reindex_groups(self):
+    def reindex_groups(self,group_dim=None,assoc_coords=None):
         """
         Reindex/rebuild the group coordinates and multinded in the dataset to match the original coordinates
         """
-        return reindex_groups(self._obj)
+        return reindex_groups(self._obj,group_dim,assoc_coords)
     def rename_groups(self,grpmap):
         return rename_groups(self._obj,grpmap)
 

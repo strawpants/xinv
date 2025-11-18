@@ -50,7 +50,7 @@ def neqadd(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     #find the auxiliary dimensions (ignore the unknown parameter dimension, and group_id/and seq)
     
     xinvcoords=find_xinv_coords(dsneq,exclude=[xinv_tp.grp_id_co,xinv_tp.grp_seq_co])
-    group_id_co,group_seq_co=find_group_coords(dsneq)
+    group_id_co,group_seq_co,_=find_group_coords(dsneq)
 
     #check if the group id and sequence coordinates are present in the first system
     if group_id_co is not None and group_seq_co is not None:

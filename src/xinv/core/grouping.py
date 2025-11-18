@@ -6,13 +6,15 @@ from xinv.core.attrs import find_component, get_xunk_size_coname, group_id_attrs
 import pandas as pd
 from xinv.core.logging import xinvlogger
 
-def find_group_coords(dsneq):
+def find_group_coords(dsneq,grpdim=None,assoc_coords=None):
     """
     Find the group id and sequence coordinates in a dataset
     Parameters
     ----------
     dsneq : xr.Dataset
         Contains Normal equations system elements or a solution thereof
+    grpdim: str
+        name of the dimension which matches the group coordinates
     Returns
         
     -------
@@ -20,15 +22,40 @@ def find_group_coords(dsneq):
         The group id and seq coordinate or (None,None) if not found
     
     """
-
-    try:
-        group_id_co=find_component(dsneq,xinv_tp.grp_id_co)
-        group_seq_co=find_component(dsneq,xinv_tp.grp_seq_co)
-    except KeyError:
-        group_id_co=None
-        group_seq_co=None
+    group_id_co=None
+    group_seq_co=None
     
-    return group_id_co,group_seq_co
+    #try to find heuristically by naming
+    if grpdim is not None:
+        for k,var in dsneq.variables.items():
+            if len(var.dims) > 0 and var.dims[0] == grpdim:
+                if k.endswith('grp_id'):
+                    group_id_co=dsneq[k]
+                elif k.endswith('grp_seq'):
+                    group_seq_co=dsneq[k]
+    else:
+        try:
+            group_id_co=find_component(dsneq,xinv_tp.grp_id_co)
+            group_seq_co=find_component(dsneq,xinv_tp.grp_seq_co)
+        except KeyError:
+            pass
+        
+    #try to find the associated coordinates found in the group_id
+    group_asso_co={}
+    if group_id_co is not None:
+        for asso_co_name in np.unique(group_id_co):
+
+            if asso_co_name in dsneq:
+                group_asso_co[asso_co_name]=dsneq[asso_co_name]
+            elif assoc_coords is not None and asso_co_name in assoc_coords:
+                group_asso_co[asso_co_name]=assoc_coords[asso_co_name]
+            else:
+                xinvlogger.warning(f"Missing associated group id coordinate: {asso_co_name}, consider adding from original source")
+                group_asso_co[asso_co_name]=None
+
+
+        
+    return group_id_co,group_seq_co,group_asso_co
 
 def build_group_coord(data,dim='xinv_unk',group_id_name="xinv_grp_id",group_seq_name="xinv_grp_seq"):
    
@@ -177,13 +204,17 @@ def get_group(dsneq,groupname):
 
     return dsout
 
-def reindex_groups(dsneq):
+def reindex_groups(dsneq,group_dim=None,assoc_coords=None):
     """
     Rebuilds the groups,sequences into a multiIndex of a dataset containing a Normal equation system or solution thereof (e.g. read from a file)
     Parameters
     ----------
     dsneq : xr.Dataset
         Contains Normal equations system elements or a solution thereof
+    group_dim:str
+        name of a specific group_dimension to look for group coordinates
+    assoc_coords: dict
+        dictionary with auxiliary source coordinates which can be copied when they are associated with the group_id's
     returns: xr.Dataset
         An xarray.Dataset with a valid multindex
 
@@ -192,23 +223,40 @@ def reindex_groups(dsneq):
     
 
     
-    try:
-        NorCOV=find_component(dsneq,xinv_tp.N)
-    except KeyError:
-        NorCOV=find_component(dsneq,xinv_tp.COV)
+#    try:
+ #       NorCOV=find_component(dsneq,xinv_tp.N)
+ #   except KeyError:
+ #       NorCOV=find_component(dsneq,xinv_tp.COV)
     
-    unkdim=NorCOV.dims[0]
-
+ #   unkdim=NorCOV.dims[0]
+    if group_dim is None:
+        try:
+            _,group_dim=get_xunk_size_coname(dsneq)
+        except StopIteration:
+            #try in a different way
+                
+            try:
+                NorCOV=find_component(dsneq,xinv_tp.N)
+            except KeyError:
+                NorCOV=find_component(dsneq,xinv_tp.COV)
     
+            group_dim=NorCOV.dims[0]
+ 
     #try to find a group id and sequence dimensions
-    group_id_co,group_seq_co=find_group_coords(dsneq)
+    group_id_co,group_seq_co,asso_co=find_group_coords(dsneq,group_dim,assoc_coords)
         
     if group_id_co is None or group_seq_co is None:
         raise RuntimeError("Group id and sequence coordinates can not be found from xinv attributes")
     
 
     #recreate the multindex based on the group and seq id
-    grp_co=build_group_coord([dsneq[group_id_co.name].data,dsneq[group_seq_co.name].data],dim=unkdim,group_id_name=group_id_co.name,group_seq_name=group_seq_co.name)
+    grp_co=build_group_coord([dsneq[group_id_co.name].data,dsneq[group_seq_co.name].data],dim=group_dim,group_id_name=group_id_co.name,group_seq_name=group_seq_co.name)
+    
+    #possibly augment with associated coordinates
+
+    #import pdb; pdb.set_trace()
+    grp_co.update(asso_co)
+
     dsneq=dsneq.drop_vars([group_id_co.name,group_seq_co.name]).assign_coords(grp_co)
 
     return dsneq
@@ -216,7 +264,7 @@ def reindex_groups(dsneq):
 
 def rename_groups(dsneq,grpmap):
     #try to find a group id and sequence dimensions
-    group_id_co,group_seq_co=find_group_coords(dsneq)
+    group_id_co,group_seq_co,_=find_group_coords(dsneq)
     if group_id_co is None or group_seq_co is None:
         raise RuntimeError("Group id and sequence coordinates can not be found from xinv attributes, no consistent renaming possible")
     #first remap the coordinate names themselves

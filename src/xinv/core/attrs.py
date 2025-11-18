@@ -194,6 +194,7 @@ def get_xunk_size_coname(dsneq):
     xunkconame=next(iter(xunk_co))
     return dsneq.sizes[xunk_co[xunkconame].dims[0]],xunkconame
 
+
 def unlink(davar):
     """
     Unlink a variable by changing its state to unlinked
@@ -240,7 +241,7 @@ def change_state(davar,state):
         davar.attrs["xinv_state"]=state
 
 
-def get_state(davar):
+def get_state(davar,raiseError=True):
     """
     Get the state of a coordinate variable
     Parameters
@@ -256,9 +257,12 @@ def get_state(davar):
     if "xinv_state" in davar.attrs:
         return davar.attrs["xinv_state"]
     else:
-        raise ValueError("No xinv_state attribute found")
+        if raiseError:
+            raise ValueError("No xinv_state attribute found")
+        else:
+            return None
 
-def get_type(davar):
+def get_type(davar,raiseError=True):
     """
     Get the type of a coordinate variable
     Parameters
@@ -274,4 +278,7 @@ def get_type(davar):
     if "xinv_type" in davar.attrs:
         return davar.attrs["xinv_type"]
     else:
-        raise ValueError("No xinv_type attribute found")
+        if raiseError:
+            raise ValueError("No xinv_type attribute found")
+        else:
+            return None

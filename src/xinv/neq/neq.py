@@ -41,7 +41,7 @@ def zeros(rhsdims,coords,lower=0,norder='C'):
         sigma0=(rhsdims[1:],np.zeros(rhsshape[1:]))
         nobs=(rhsdims[1:],np.zeros(rhsshape[1:],dtype=np.int64))
         npara=(rhsdims[1:],np.zeros(rhsshape[1:],dtype=np.int64))
-
+        
         if grpco is not None:
             dsneq=xr.Dataset(dict(N=N,rhs=rhs,x0=x0,ltpl=ltpl,nobs=nobs,npara=npara,sigma0=sigma0),coords=grpco).assign_coords({ky:co for ky,co in coords.items() if ky != rhsdims[0]})
         else:
