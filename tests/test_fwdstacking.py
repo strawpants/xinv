@@ -13,6 +13,7 @@ from xinv.core.exceptions import XinvIllposedError
 import os
 
 neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly.nc')
+neqfile_illposed=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_illposed.nc')
 
 #note apply a seed to garantee reproducibility (otherwise tests may fail in  statistical sense)
 rg=np.random.default_rng(12789)
@@ -93,6 +94,9 @@ def test_illposed(noisystacked):
         #we're not supposed to end up here
         assert False
     except XinvIllposedError as e:
+        #save to test file for later tests
+        if not os.path.exists(neqfile_illposed):
+            dsneq.reset_index('xinv_unk').to_netcdf(neqfile_illposed)
         assert True
         
 def test_stacked(noisystacked):

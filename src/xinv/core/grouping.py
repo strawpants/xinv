@@ -2,9 +2,11 @@
 ## Copyright (c) 2025 Roelof Rietbroek, r.rietbroek@utwente.nl
 import numpy as np
 import xarray as xr
-from xinv.core.attrs import find_component, get_xunk_size_coname, group_id_attrs, group_seq_attrs,find_xinv_coords, xunk_coords_attrs,xinv_tp,xinv_st
+from xinv.core.attrs import find_component, get_xunk_size_coname, group_id_attrs, group_seq_attrs,find_xinv_coords, xunk_coords_attrs,xinv_tp,xinv_st,unlink,is_linked
 import pandas as pd
 from xinv.core.logging import xinvlogger
+from xinv.core.tools import find_ilocs
+
 
 def find_group_coords(dsneq,grpdim=None,assoc_coords=None):
     """
@@ -18,13 +20,13 @@ def find_group_coords(dsneq,grpdim=None,assoc_coords=None):
     Returns
         
     -------
-    (group_id_co,group_seq_co) : xr.DataArray
-        The group id and seq coordinate or (None,None) if not found
+    (group_id_co,group_seq_co,group_assoc_co) : xr.DataArray
+        The group id and seq coordinate or (None,None,None) if not found
     
     """
     group_id_co=None
     group_seq_co=None
-    
+    group_asso_co=None 
     #try to find heuristically by naming
     if grpdim is not None:
         for k,var in dsneq.variables.items():
@@ -39,10 +41,16 @@ def find_group_coords(dsneq,grpdim=None,assoc_coords=None):
             group_seq_co=find_component(dsneq,xinv_tp.grp_seq_co)
         except KeyError:
             pass
-        
+    #check if they are currently linked
+    if group_seq_co is not None and group_id_co is not None:
+        if not( is_linked(group_seq_co) and is_linked(group_id_co)):
+            #reset
+            group_seq_co=None
+            group_id_co=None
+            
     #try to find the associated coordinates found in the group_id
-    group_asso_co={}
     if group_id_co is not None:
+        group_asso_co={}
         for asso_co_name in np.unique(group_id_co):
 
             if asso_co_name in dsneq:
@@ -101,26 +109,80 @@ def expand_as_group(dsin,group_dim,group_id_dim="xinv_grp_id",group_seq_dim="xin
         
 
     """
-    dsout=dsin.expand_dims(dim=group_id_dim).rename({group_dim:group_seq_dim}).assign_coords({group_id_dim:(group_id_dim,[group_dim]),group_seq_dim:(group_seq_dim,np.arange(len(dsin[group_dim])))})
+    xinvlogger.warning("expand-as_group is deprecated, use as_group instead")
+
+    dsout=dsin.expand_dims(dim=group_id_dim,axis=None).rename({group_dim:group_seq_dim}).assign_coords({group_id_dim:(group_id_dim,[group_dim]),group_seq_dim:(group_seq_dim,np.arange(len(dsin[group_dim])))})
     if type(dsout) == xr.DataArray:
         dsout=dsout.to_dataset()
     # dsout=dsout.rename({group_dim:group_seq_dim})
-
     #For retrieval purposes later: copy the original parameters back to the old dimension
     dsout=dsout.assign_coords({group_dim:dsin[group_dim]})
-    
     # add xinv attributes to mark the original coordinates as unlinked
     dsout[group_dim].attrs.update(xunk_coords_attrs(state="unlinked"))    
     dsout[group_id_dim].attrs.update(group_id_attrs(state="linked"))
     dsout[group_seq_dim].attrs.update(group_seq_attrs(state="linked"))
-
     if stack_dim is not None:
         dsout=dsout.stack({stack_dim:[group_id_dim,group_seq_dim]})
         dsout[stack_dim].attrs.update(xunk_coords_attrs(state="linked"))
-    
+        
+        #possibly rename dangling transpose dimensions
+        dimrename={}
+        for dim in dsout.dims:
+            if dim == group_dim+'_' and dim not in dsout.coords:
+                dimrename[dim]=stack_dim+"_"
+        if dimrename:
+            dsout=dsout.rename_dims(dimrename)
+        
+
+        #possibly fix the order of some matrices which may now be transposed ue to the stacking
     return dsout
 
+def as_group(dsin,arg=None,*,group_id_dim="xinv_grp_id",group_seq_dim="xinv_grp_seq",lookup_co=None,**kwargs):
+    
+    #extract mapping either from arg or from kwargs arguments
+    if arg is not None:
+        old_coord_name,group_coord_name=next(iter(arg.items()))
+    elif len(kwargs) == 1:
+        old_coord_name,group_coord_name=next(iter(kwargs.items()))
+    else:
+        raise ValueError("No group mapping provided. use either named arguments oldcoord=new_group_coord, or a provide a dictionary with the mapping")
 
+    #create a  new Dataset using all of the existing coordinates from the input
+    dsout=xr.Dataset(coords=dsin.coords,attrs=dsin.attrs)
+    
+    # unlink old coordinate
+    unlink(dsout[old_coord_name])
+    if lookup_co is not None:
+        try:
+            grp_idx=find_ilocs(lookup_co,old_coord_name,dsin[old_coord_name])
+            #overwrite old coordinate with the lookup one for consistency
+            dsout=dsout.assign_coords({old_coord_name:lookup_co[old_coord_name]})
+        except:
+            raise RuntimeError("Can not find all of parameters in the lookup dataset")
+    else:
+        grp_idx=np.arange(dsin.sizes[old_coord_name])
+        #just incrementally increasing sequence
+    mi=pd.MultiIndex.from_tuples([(old_coord_name,i) for i in grp_idx],names=[group_id_dim,group_seq_dim])
+
+    groupcoord=xr.Coordinates.from_pandas_multiindex(mi,dim=group_coord_name)
+    
+    dsout=dsout.assign_coords(groupcoord)
+    
+    # add xinv attributes 
+
+    dsout[group_coord_name].attrs.update(xunk_coords_attrs(state="linked"))    
+    dsout[group_id_dim].attrs.update(group_id_attrs(state="linked"))
+    dsout[group_seq_dim].attrs.update(group_seq_attrs(state="linked"))
+
+    #copy and rename relevant variables
+    for vname in dsin.variables:
+        if vname not in dsout.variables:
+            #only copy stuff which is not yet in there
+            newdims=[dim.replace(old_coord_name,group_coord_name) for dim in dsin[vname].dims]
+            dsout[vname]=(newdims,dsin[vname].data,dsin[vname].attrs) 
+
+
+    return dsout
 
 def get_group(dsneq,groupname):
     """

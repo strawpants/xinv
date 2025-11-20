@@ -7,9 +7,9 @@ from collections import namedtuple
 from xinv.core.logging import xinvlogger 
 
 #centrally define the xinv attributes
-_xinvtype=namedtuple("_xinvtype","unk_co aux_co grp_id_co grp_seq_co N COV rhs solest stdsolest x0 ltpl sigma0 nobs npara")
+_xinvtype=namedtuple("_xinvtype","unk_co aux_co grp_id_co grp_seq_co N COV REG rhs solest stdsolest x0 ltpl sigma0 alpha nobs npara")
 
-xinv_tp=_xinvtype("unk_coord","aux_coord","group_id_coord","group_seq_coord","N","COV", "rhs","solest","solest_std","aprioriVec","ltPl","sigma0","nobs","npara")
+xinv_tp=_xinvtype("unk_coord","aux_coord","group_id_coord","group_seq_coord","N","COV","REG", "rhs","solest","solest_std","aprioriVec","ltPl","sigma0","alpha","nobs","npara")
 
 
 _xinvstate=namedtuple("_xinvstate","linked unlinked init apri post symU symL cholU cholL")
@@ -40,6 +40,14 @@ def N_attrs(lower=0):
 
     return xinv_attrs(xinv_tp.N,state,"Normal matrix")
 
+def REG_attrs(lower=0):
+    if lower == 0:
+        state=xinv_st.symU
+    else:
+        state=xinv_st.symL
+
+    return xinv_attrs(xinv_tp.REG,state,"Regularization matrix")
+
 def Chol_attrs(lower=0):
     if lower == 0:
         state=xinv_st.cholU
@@ -69,6 +77,10 @@ def ltpl_attrs(state=xinv_st.apri):
 
 def sigma0_attrs(state=xinv_st.apri):
     return xinv_attrs(xinv_tp.sigma0,state,"apriori/posteriori standard deviation error scale")
+
+def alpha_attrs(state=xinv_st.init):
+    return xinv_attrs(xinv_tp.alpha,state,"Initial regularization matrix scale factor")
+
 
 def nobs_attrs():
     return xinv_attrs(xinv_tp.nobs,xinv_st.init,"number of original observations")
@@ -106,9 +118,9 @@ def find_component(dsneq,component):
         compname=[ky for ky in components if "xinv_type" in dsneq[ky].attrs and dsneq[ky].attrs['xinv_type'] == component ]
         return dsneq[compname[0]]
     except KeyError:
-        raise KeyError(f"Cannot find {component} component in NEQ dataset")
+        raise KeyError(f"Cannot find {component} component in dataset")
     except IndexError:
-        raise KeyError(f"Cannot find {component} component in NEQ dataset")
+        raise KeyError(f"Cannot find {component} component in dataset")
 
 def find_components(dsneq,components):
     out=[]
@@ -223,6 +235,9 @@ def link(davar):
     """
     change_state(davar,xinv_st.linked)
 
+def is_linked(davar):
+    return get_state(davar) == xinv_st.linked
+
 def change_state(davar,state):
     """
     Change the state of a variable to a new state
@@ -282,3 +297,5 @@ def get_type(davar,raiseError=True):
             raise ValueError("No xinv_type attribute found")
         else:
             return None
+
+

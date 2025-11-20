@@ -52,6 +52,9 @@ def neqbase(request):
         #simple normal equation system
         neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_simple.nc')
         dsneq=xr.load_dataset(neqfile1)
+    elif request.param == 'ill posed':
+        neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_illposed.nc')
+        dsneq=xr.load_dataset(neqfile1).xi.reindex_groups()
     else:
         neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly.nc')
         dsneq=xr.load_dataset(neqfile1).xi.reindex_groups()

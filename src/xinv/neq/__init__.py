@@ -5,4 +5,4 @@ from .add import *
 from .reduce import *
 from .set_x0 import *
 from .fix import *
-
+from .regularize import regadd

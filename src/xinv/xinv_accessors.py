@@ -6,14 +6,14 @@ import xarray as xr
 from xinv.neq import solve as neqsolve
 from xinv.neq import transform as neqtransform
 from xinv.neq import groupreduce,reduce,ireduce
-
+from xinv.neq import regadd
 from xinv.neq import fix,ifix,groupfix
 from xinv.neq import set_x0 as neqset_x0
 from xinv.neq import neqadd
 from xinv.neq import zeros as neqzeros
 from xinv.neq.build import build_normal as neqbuild_normal
 
-from xinv.core.grouping import get_group,reindex_groups,rename_groups
+from xinv.core.grouping import get_group,reindex_groups,rename_groups,as_group
 
 from xinv.core.attrs import find_xinv_coords,xinv_tp,xinv_st
 
@@ -62,6 +62,26 @@ class InverseDsAccessor:
 
     def add(self,dsneqother):
         return neqadd(self._obj,dsneqother) #add/merge another normal equation system
+
+    def reg(self,dsreg,alpha=None):
+        """
+        Add a regularization to a normal equationsystem
+        
+        Parameters
+        ----------
+        dsreg: xr.Dataset
+            Regularization matrix
+        alpha:float,optional,
+            apply a different scaling than provided with
+        """
+        return regadd(self._obj,dsreg,alpha=alpha)
+
+
+    def as_group(self,arg=None,**kwargs):
+        """ 
+        Expand system as group
+        """
+        return as_group(self._obj,arg,**kwargs)
 
     def get_group(self,group_name):
         return get_group(self._obj,group_name)
