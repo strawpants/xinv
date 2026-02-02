@@ -376,7 +376,7 @@ class FILEREF(SNXBlock):
             elif line.startswith('*'):
                 #comment
                 continue
-            ky=line[1:19]
+            ky=line[1:19].rstrip()
             val=line[20:-1]
             globattrs["SNX-"+ky]=val
         dsout.attrs.update(globattrs)

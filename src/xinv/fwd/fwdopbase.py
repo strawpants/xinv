@@ -6,7 +6,7 @@ import xarray as xr
 from xinv.core.attrs import rhs_attrs,N_attrs,ltpl_attrs,sigma0_attrs,nobs_attrs,npara_attrs,find_xinv_coords, xunk_coords_attrs,aux_coords_attrs,x0_attrs
 
 from xinv.neq.build import build_normal as neq_build_normal
-
+from xinv.core.logging import xinvlogger
 class FwdOpbase:
     def __init__(self,obs_dim=None,unknown_dim=None,cache=False,jacobname="jacobian",**bindargs):
         self._obsdim=obs_dim
@@ -18,6 +18,7 @@ class FwdOpbase:
         self._jacobname=jacobname
         #to be forwarded to the jacobian implementation together with additional arguments
         self._bindargs=bindargs
+        self._bindstate=None
 
     @property
     def unkdim(self):
@@ -45,7 +46,7 @@ class FwdOpbase:
             # raise ValueError("Requesting the Jacobian without arguments requires caching abilities of the forward operator")
         # elif daobs is None:
             # return self._jacob
-
+        
         jacob=self._jacobian_impl(**self._bindargs,**kwargs)
         if type(jacob) == xr.DataArray:
             jacob.name=self._jacobname
@@ -64,7 +65,21 @@ class FwdOpbase:
         #just forward the call to the implementation
         return neq_build_normal(self,daobs,ecov)
 
-    
-    def __call__(self,inpara,**kwargs):
+    def bind_state(self,dastate):
+        """
+        Bind state  to this forward operator so calls to __call__ can be simplified
+        """
+        if self._bindstate is not None:
+            xinvlogger.warning("Overwriting state")
+        self._bindstate=dastate
+        return self
+
+    def __call__(self,inpara=None,**kwargs):
         """Apply the forward operator"""
-        return self.jacobian(**kwargs)[self._jacobname]@inpara
+        if inpara is None and self._bindstate is None:
+            raise RuntimeError("Cannot apply forward operator without state vector, either bind it to the forward operator with bind_state, or supply the state as the first argument to the call function (inpara=,..)") 
+        
+        if inpara is None:
+            return self.jacobian(**kwargs)[self._jacobname]@self._bindstate
+        else:
+            return self.jacobian(**kwargs)[self._jacobname]@inpara

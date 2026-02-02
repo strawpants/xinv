@@ -42,4 +42,6 @@ class FwdStackOp(FwdOpbase):
             self._obsdim=fwdop._obsdim
 
         self._fwdops.append(fwdop)
-        
+
+    def __getitem__(self,ithop):
+        return self._fwdops[ithop]

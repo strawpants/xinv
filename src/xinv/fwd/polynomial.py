@@ -17,13 +17,15 @@ class Polynomial(FwdOpbase):
         self._x0=x0
         self._poly_x=poly_x
 
-    def _jacobian_impl(self,daobs=None,x=None, auxcoords=None):
+    def _jacobian_impl(self,**kwargs):
         """Creates the Jacobian of the forward operator (note:linear operator)"""
         #figure out the xcoords to use for the polynomial
-        if x is not None:
-            xcoords=np.asarray(x)
-        elif daobs is not None and self._poly_x in daobs.coords:
-            xcoords=daobs.coords[self._poly_x].data
+        if self._poly_x in kwargs:
+            xcoords=kwargs[self._poly_x]
+            if type(xcoords) == list:
+                xcoords=np.asarray(cxoords)
+        elif "daobs" in kwargs:
+            xcoords=kwargs['daobs'].coords[self._poly_x]
         else:
             raise ValueError(f"Polynomial Jacobian operator cannot figure out xcoord values, provide either dataarray 'daobs' or through a xcoords argument to the Jacobian")
 
@@ -31,17 +33,22 @@ class Polynomial(FwdOpbase):
             self._x0=np.mean(xcoords).item()
        
         #possibly copy auxiliary coordinates from the input
-        if auxcoords is not None:
-            coords={ky:val for ky,val in auxcoords.items()}
+        if "auxcoords" in kwargs:
+            coords={ky:val for ky,val in kwargs['auxcoords'].items()}
         else:
             coords={}
         #make sure that the xcoords share the obsdim
-        coords[self._poly_x]=(self._obsdim,xcoords)
+        coords[self._poly_x]=(self._obsdim,xcoords.data)
         coords[self._unkdim]=(self._unkdim,self._unkcoord)
         
 
         order='C'
         jacobian=xr.DataArray(np.zeros([len(xcoords),self._n+1],order=order),dims=[self._obsdim,self._unkdim],name="poly_jacobian",coords=coords)
+        
+        #add some attributes
+        # jacobian[self._obsdim].attrs["x0"]=self._x0
+        # jacobian[self._unkdim].attrs["delta_x"]=self._delta_x
+
         #normalize xcoords to proposed time scale
         xcoords_rel=((xcoords-self._x0)/self._delta_x).data
         #fill polynomial scales

@@ -4,6 +4,11 @@
 import numpy as np
 import xarray as xr
 from xinv.fwd import FwdOpbase
+import pandas as pd
+
+
+# time delta of an average year 365.25 days
+delta1year=np.timedelta64(365,'D')+np.timedelta64(int(86400/4),'s')
 
 class Harmonics(FwdOpbase):
     def __init__(self,freqs,harm_x="time",unknown_dim="harmonic",x0=None,delta_x=1,obs_dim=None,**kwargs):
@@ -11,7 +16,9 @@ class Harmonics(FwdOpbase):
         if obs_dim is None:
             obs_dim=harm_x
         super().__init__(obs_dim=obs_dim, unknown_dim=unknown_dim,**kwargs)
+        self._unkcoord=pd.MultiIndex.from_tuples([(tr,fr) for fr in freqs for tr in ['cos','sin']],names=["trig","freq"])
         self._freqs=freqs
+        # self._unkcoord=xr.indexes.PandasMultiIndex(mi,dim=unknown_dim)
         self._x0=x0
         self._delta_x=delta_x
         self._n=2*len(self._freqs)
@@ -31,25 +38,29 @@ class Harmonics(FwdOpbase):
         else:
             raise ValueError(f"Harmonic Jacobian operator cannot figure out xcoord values, provide either dataarray 'daobs' or {self._harm_x} coordinate")
         order='C'
-        jacobian=xr.DataArray(np.zeros([len(xcoords),self._n], order=order), dims=[self._obsdim,self._unkdim], name="harmonic_jacobian", coords={self._obsdim:xcoords,self._unkdim:np.arange(self._n)})
+        jacobian=xr.DataArray(np.zeros([len(xcoords),self._n], order=order), dims=[self._obsdim,self._unkdim], name="harmonic_jacobian", coords={self._obsdim:xcoords,self._unkdim:self._unkcoord})
         
         if self._x0 is None:
             self._x0=np.mean(xcoords).item()          
-            
         for i, freq in enumerate(self._freqs):
             omega_t=freq*(((xcoords-self._x0)/self._delta_x).astype(np.float64))
-            jacobian.loc[:,2*i]=np.cos(omega_t)
-            jacobian.loc[:,2*i+1]=np.sin(omega_t)
+            jacobian[:,2*i]=np.cos(omega_t)
+            jacobian[:,2*i+1]=np.sin(omega_t)
             
         return jacobian
-    
+
+
 class SeasonalHarmonics(Harmonics):
-    def __init__(self,x0,semi_annual=True,harm_x="time",delta_x=np.timedelta64(365,'D')+np.timedelta64(int(86400/4),'s')):
+    def __init__(self,x0,semi_annual=True,harm_x="time",delta_x=delta1year):
         
         freqs=[2*np.pi]
         if semi_annual is True:
             freqs.append(4*np.pi)
-            
+        
+        if delta_x != delta1year:
+            #rescale frequencies
+            scale=delta_x.astype(delta1year.dtype)/delta1year
+            freqs=[scale*fr for fr in freqs] 
         super().__init__(freqs=freqs,unknown_dim="harmonics_seasonal",harm_x=harm_x,delta_x=delta_x,x0=x0)
 
         

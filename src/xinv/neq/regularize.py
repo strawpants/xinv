@@ -104,12 +104,20 @@ def regadd(dsneq:xr.Dataset,dsreg:xr.Dataset,alpha=None,inplace=False):
         alpha=dsreg.alpha.item()
     
     if not inplace:
-        dsneq=dsneq.copy(deep=True)
+        dsneq=dsneq.xi.deepcopy()
     
     # find normal matrix of the input
     try:
         N=find_component(dsneq,xinv_tp.N)
+        sigma0=find_component(dsneq,xinv_tp.sigma0)
+        #check for common sigma (required)
+        if sigma0.shape:
+            #they all need to be equal
 
+            np.all(sigma0.data[0] == sigma0.data)
+            sigma=sigma0.data[0]
+        else:
+            sigma=sigma0.item()
     except:
         raise ValueError("Cannot find normal matrix in the input")
     
@@ -148,6 +156,9 @@ def regadd(dsneq:xr.Dataset,dsreg:xr.Dataset,alpha=None,inplace=False):
         idxr=find_ilocs(dsneq,unkdim,R[unkdimreg].data)
     
     except KeyError:
+        # extract a subset of the matrix and issue a warning about unused parameters
+
+
         raise KeyError("Regularization coordinate contain values not found in the normal equation system")
 
 
@@ -155,11 +166,11 @@ def regadd(dsneq:xr.Dataset,dsreg:xr.Dataset,alpha=None,inplace=False):
     # possibly expand sparse regularization matrix (can be improved/specialized when performance requires it)
     if hasattr(R.data,'todense'):
         R.data=R.data.todense()
-
+    scale=np.power(sigma ,2) * alpha
     #add scaled regularization matrix inplace
     if islower(N) == islower(R):
-        N[idxr,idxr]+=alpha*R.data
+        N[idxr,idxr]+=scale*R.data
     else:
         #add transpose
-        N[idxr,idxr]+=alpha*R.data.T
+        N[idxr,idxr]+=scale*R.data.T
     return dsneq

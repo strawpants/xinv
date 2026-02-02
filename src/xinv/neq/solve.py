@@ -18,13 +18,25 @@ def solve(dsneq,inplace=False):
     
     if not inplace:
         #copy entire NEQ and operate on that one in place
-        dsneq=dsneq.copy(deep=True)
+        dsneq=dsneq.xi.deepcopy(order='F')
+        #dsneq=dsneq.copy(deep=True)
 
 
     N,rhs,x0,ltpl,sigma0,nobs,npara=find_neq_components(dsneq)
-
-    b=rhs.copy(deep=True)
     
+    # if not inplace:
+        # #note xarray copy does not always do actual deep copy
+        # rhs.data=rhs.data.copy(order='F')
+        # #link back to output neq
+        # dsneq[rhs.name]=rhs
+
+        # #note xarray copy does not always do actual deep copy
+        # N.data=N.data.copy(order='F')
+        # #link back to output neq
+        # dsneq[N.name]=N
+
+    b=rhs.xi.deepcopy()
+    #b.data=rhs.data.copy(order='F')    
     #decompose the normal matrix using cholesky in place N -> U'U or LL'
     cholesky_inplace(N)
     

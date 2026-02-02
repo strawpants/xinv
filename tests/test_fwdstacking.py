@@ -9,6 +9,7 @@ from xinv import *
 from xinv.fwd.polynomial import Polynomial
 from xinv.fwd.harmonics import SeasonalHarmonics
 from xinv.fwd.fwdstack import FwdStackOp
+from xinv.fwd.seaspoly import SeasPoly
 from xinv.core.exceptions import XinvIllposedError
 import os
 
@@ -112,14 +113,17 @@ def test_stacked(noisystacked):
     npoly=noisystacked.attrs['npoly']
     t0=noisystacked.attrs['t0']
     delta_t=noisystacked.attrs['delta_t']
-    polyfwd=Polynomial(n=npoly,poly_x='time',cache=True,x0=t0,delta_x=delta_t)
-    
-    #initialize the stacked forward operator
-    fwdstck=FwdStackOp(polyfwd)
 
-    #Append Annual and Seminannual fwd operators
-    seasfwd=SeasonalHarmonics(x0=t0,semi_annual=True)
-    fwdstck.append(seasfwd)
+    #use convenience function for the stacked operator
+    fwdstck=SeasPoly(npoly=npoly,t0=t0,x_coord="time",semi_annual=True)
+    # polyfwd=Polynomial(n=npoly,poly_x='time',cache=True,x0=t0,delta_x=delta_t)
+    
+    # #initialize the stacked forward operator
+    # fwdstck=FwdStackOp(polyfwd)
+
+    # #Append Annual and Seminannual fwd operators
+    # seasfwd=SeasonalHarmonics(x0=t0,semi_annual=True)
+    # fwdstck.append(seasfwd)
 
     # #build the normal equation system
     std_noise=0.5
