@@ -41,11 +41,11 @@ def regSys(dain:xr.DataArray,lower=0):
 
     dsout=dain.to_dataset(name=name)
     
-    #check if a coordinate on the second dimension exist and drop ity whne consistent
+    #check if a coordinate on the second dimension exist and whether they are consistent
     if dain.dims[1] in dsout.coords:
-        if np.all(dsout.coords[dain.dims[0]].data == dsout.coords[dain.dims[1]].data):        
-            dsout=dsout.drop_vars([dain.dims[1]])
-        else:
+        if not np.all(dsout.coords[dain.dims[0]].data == dsout.coords[dain.dims[1]].data):        
+            # dsout=dsout.drop_vars([dain.dims[1]])
+        # else:
             raise RunTimeError("Coordinates on the sides are not equal, refusing to proceed")
 
     dsout[name].attrs.update(REG_attrs(lower))
