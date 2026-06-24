@@ -16,7 +16,7 @@ class CovarianceMat(CovarianceBase):
             N=xr.apply_ufunc(np.linalg.inv,cov)
         else:
             N=N_or_Cov
-            cov=xr.apply_ufunc(np.linalg.inv,N)
+            # cov=xr.apply_ufunc(np.linalg.inv,N)
 
         super().__init__(N=N)
 

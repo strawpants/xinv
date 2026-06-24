@@ -22,8 +22,8 @@ class Polynomial(FwdOpbase):
         #figure out the xcoords to use for the polynomial
         if self._poly_x in kwargs:
             xcoords=kwargs[self._poly_x]
-            if type(xcoords) == list:
-                xcoords=np.asarray(cxoords)
+            if type(xcoords) != xr.DataArray:
+                xcoords=xr.DataArray(xcoords,dims=self._poly_x)
         elif "daobs" in kwargs:
             xcoords=kwargs['daobs'].coords[self._poly_x]
         else:
