@@ -44,3 +44,4 @@ def test_tikhonov(neqbase):
     dssolv=neqbasereg.xi.solve()
     # Check if the results make sense (constraint values should be close to zero)
     assert np.allclose(dssolv.solution.sel(xinv_unk=('poly2',0)),0)
+

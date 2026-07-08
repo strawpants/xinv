@@ -7,11 +7,21 @@ from xinv.core.attrs import find_xinv_unk_coord,get_state,get_type,xinv_tp,xinv_
 from xinv.core.logging import xinvlogger
 import pandas as pd
 
-def find_ilocs(dsneq,dim,elements):
+def find_ilocs(dsneq,dim,elements,reverse=False):
     idxname=f"_{dim}_idx"
     if idxname not in dsneq.keys():
         dsneq[idxname]=(dim,np.arange(dsneq.sizes[dim]))
-    return dsneq[idxname].loc[elements].data
+    
+    idx=dsneq[idxname].loc[elements].data
+    
+    if reverse:
+        return dsneq[idxname][~dsneq[idxname].isin(idx)].data
+            
+    else:
+        return idx
+
+
+
 
 def find_overlap_coords(coord1,coord2):
     """
@@ -53,8 +63,8 @@ def find_unk_idx(dsneq,labels=None,sort=True,**kwargs):
         idxremaining: np.ndarray or None
             
             Indices of the unknown parameters that are complementary to the ones found
-        idxnotfound: np.ndarray or None
-            Indices of the requested unknown parameters that were not found in the system
+        notfound: int or None
+            Amount of parameters not found in the system
             
     """
     xunk_co=find_xinv_unk_coord(dsneq)
@@ -68,7 +78,7 @@ def find_unk_idx(dsneq,labels=None,sort=True,**kwargs):
     group_id_co=None
     group_seq_co=None
 
-    notfound=[]
+    notfound=0
     found=[]
     remaining=[]
     for coname,searchparams in kwargs.items():
@@ -86,34 +96,30 @@ def find_unk_idx(dsneq,labels=None,sort=True,**kwargs):
                 searchparams=xr.DataArray(searchparams,dims=dimname)
         #find unique and overlapping coordinates over the unknown dimension
         notfnd,fnd,remng=find_overlap_coords(searchparams,co_search)
-       
         if get_state(co_search) == xinv_st.unlinked:
             #we may have to apply an additional lookup in the group unknown multiindex
             if group_id_co is None and group_seq_co is None:
                 group_id_co,group_seq_co=find_xinv_group_coords(dsneq)
-            notfound.extend([(coname,i) for i in find_ilocs(dsneq,coname,notfnd)])
             found.extend([(coname,i) for i in find_ilocs(dsneq,coname,fnd)])
-            remaining.extend([(coname,i) for i in find_ilocs(dsneq,coname,remng)])
 
         elif get_state(co_search) == xinv_st.linked:
-            notfound.extend(notfnd)
             found.extend(fnd)
-            remaining.extend(remng)
         else:
             raise ValueError(f"Reduction coordinate {coname} has no valid link state")
-    
-    
+        notfound+=len(notfnd)
+    #figure out remaining parameters
 
     #index vector of the found parameters
     idxfound=find_ilocs(dsneq,unkdim,found) if len(found) > 0 else None
-    idxnotfound=find_ilocs(dsneq,unkdim,notfound) if len(notfound) > 0 else None
-    idxremaining=find_ilocs(dsneq,unkdim,remaining) if len(remaining) > 0 else None
+    
+    idxremaining=find_ilocs(dsneq,unkdim,found,reverse=True) 
+
+    
+
     if sort:
         if idxfound is not None:
             idxfound=np.sort(idxfound)
         if idxremaining is not None:
             idxremaining=np.sort(idxremaining)
-        if idxnotfound is not None:
-            idxnotfound=np.sort(idxnotfound)
     
-    return idxfound,idxremaining,idxnotfound
+    return idxfound,idxremaining,notfound

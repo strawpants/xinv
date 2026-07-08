@@ -60,11 +60,9 @@ def fix(dsneq, labels=None, keep=False,**kwargs):
             coord1 = fixlabels1 , .. coord2 = fixlabels2 
 
     """
-    
-    idxfound,idxremaining,idxnotfound=find_unk_idx(dsneq,labels=labels,**kwargs)
-    if idxnotfound is not None:
-        xinvlogger.warning(f"Fix parameters contain values {idxnotfound} which are not found in the input normal equation system, ignoring those")
-
+    idxfound,idxremaining,notfound=find_unk_idx(dsneq,labels=labels,**kwargs)
+    if notfound > 0:
+        xinvlogger.warning(f"Fix parameters contain {notfound} values which are not found in the input normal equation system, ignoring those")
     if (not keep and idxremaining is None) or (keep and idxfound is None):
         xinvlogger.warning("Nothing to fix, returning input")
         return dsneq

@@ -130,9 +130,9 @@ def reduce(dsneq,labels=None, keep=False,**kwargs):
 
     """
     
-    idxfound,idxremaining,idxnotfound=find_unk_idx(dsneq,labels=labels,**kwargs)
-    if idxnotfound is not None:
-        xinvlogger.warning(f"Reduction parameters contain values {idxnotfound} which are not found in the input normal equation system, ignoring those")
+    idxfound,idxremaining,notfound=find_unk_idx(dsneq,labels=labels,**kwargs)
+    if notfound > 0:
+        xinvlogger.warning(f"Reduction parameters contain {notfound} values which are not found in the input normal equation system, ignoring those")
 
     if (not keep and idxremaining is None) or (keep and idxfound is None):
         xinvlogger.warning("Nothing to reduce, returning input")

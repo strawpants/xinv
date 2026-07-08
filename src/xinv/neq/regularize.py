@@ -9,7 +9,7 @@ import numpy as np
 from sparse import eye
 from xinv.core.tools import find_ilocs
 
-def regSys(dain:xr.DataArray,lower=0):
+def regSys(dain:xr.DataArray,lower=0,alpha=1.0):
     """
     Wrap and decorate a square symmetric input matrix so it can be used as a regularization system.
     A regularization system is essentially a simplified Normal Equation System
@@ -58,8 +58,8 @@ def regSys(dain:xr.DataArray,lower=0):
     
     
 
-    #add alpha=1.0
-    dsout['alpha']=1.0
+    
+    dsout['alpha']=alpha
     dsout.alpha.attrs.update(alpha_attrs())
 
     return dsout
@@ -93,8 +93,48 @@ def getTikhonov(*, alpha=1.0,**kwargs):
     #create a dataarray
     datik=xr.DataArray(eye(sz),dims=(name,name+'_'),coords={name:(name,param)},name="tik")
     #convert into a regularizatiobn  system
-    return regSys(datik)
+    return regSys(datik,alpha=alpha)
 
+def getMeanConstraint(coord=None, alpha=1.0,**kwargs):
+    """
+    Return a regularization matrix, which constraints the mean over the selected coordinate values
+    
+    Parameters
+    ----------
+    alpha: float, default=1.0
+        Initial scale of the regularization matrix
+    **kwargs: 
+        List of coordinate parameters to constrain. Specify as coordinatename=[1,2,4...].
+    Returns
+    -------
+        A xarray.Dataset holding a regularization matrix
+        
+    """
+    
+    if coord is not None:
+       if type(coord) != xr.DataArray:
+           raise ValueError("getMeanConstrain: when supplied coord must be xr.DataArray") 
+
+       kwargs[coord.name]=coord
+    
+    if len(kwargs) != 1:
+        raise ValueError("No or too many arguments provided")
+    name,param=next(iter(kwargs.items()))
+    
+    if type(param) != xr.DataArray:
+        param=xr.DataArray(param,dims=name)
+    sz=len(param)
+    #create a dataarray
+    datmean=xr.DataArray(np.ones([sz,sz])/(sz*sz),dims=(name,name+'_'),coords={name:param},name="meanreg")
+    
+    
+    #possibly copy coordinate attributes
+    for co in param.coords:
+        datmean[co].attrs=param.coords[co].attrs
+    
+
+    #convert into a regularizatiobn  system
+    return regSys(datmean,alpha=alpha)
 
 def regadd(dsneq:xr.Dataset,dsreg:xr.Dataset,alpha=None,inplace=False):
     """
@@ -145,11 +185,10 @@ def regadd(dsneq:xr.Dataset,dsreg:xr.Dataset,alpha=None,inplace=False):
             R=find_component(dsreg,xinv_tp.REG)
             unkdimreg=R.dims[0]
         else:
-            #check for consistency in the associated coordinates
+            #check for consistency in the associated coordinates (if present)
             for coname,co in r_asso.items():
-                if not co.equals(group_assoc[coname]):
+                if co is not None and not co.equals(group_assoc[coname]):
                     raise RuntimeError("Inconsistent associated coordinates between regularization and normal equation")
-
     if unkdim != unkdimreg:
         xinvlogger.warning("Dimensions names do not match, trying anyway")
     try:
