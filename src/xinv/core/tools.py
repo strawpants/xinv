@@ -5,6 +5,7 @@ import numpy as np
 import xarray as xr
 from xinv.core.attrs import find_xinv_unk_coord,get_state,get_type,xinv_tp,xinv_st,find_xinv_group_coords
 from xinv.core.logging import xinvlogger
+import pandas as pd
 
 def find_ilocs(dsneq,dim,elements):
     idxname=f"_{dim}_idx"
@@ -31,13 +32,15 @@ def find_overlap_coords(coord1,coord2):
     return uniq1, intersect, uniq2
 
 
-def find_unk_idx(dsneq,sort=True,**kwargs):
+def find_unk_idx(dsneq,labels=None,sort=True,**kwargs):
     """ 
         Find the indices of a set of unknown parameters in the unknown vector of a normal equation system 
         Parameters:
         -----------
         dsneq: xarray.Dataset
             Dataset containing the normal equation system
+        labels: array like
+            List/array of parameters to search for in the default unknown coordinate
         sort: bool, optional
             If True, the output indices are sorted in ascending order. The default is True.
         kwargs: dict
@@ -54,11 +57,14 @@ def find_unk_idx(dsneq,sort=True,**kwargs):
             Indices of the requested unknown parameters that were not found in the system
             
     """
-
     xunk_co=find_xinv_unk_coord(dsneq)
     
     unkdim=xunk_co.dims[0]
-    
+   
+    if labels is not None:
+        #add unnamed labels to search for to the unknown coordinate
+        kwargs[unkdim]=labels
+
     group_id_co=None
     group_seq_co=None
 
@@ -72,7 +78,12 @@ def find_unk_idx(dsneq,sort=True,**kwargs):
         dimname=co_search.dims[0]
         if searchparams is not type(xr.DataArray):
             #turn into DataArray
-            searchparams=xr.DataArray(searchparams,dims=dimname)
+
+            if unkdim in co_search.indexes and type(co_search.indexes[unkdim]) == pd.MultiIndex:
+                searchparams=xr.Coordinates.from_pandas_multiindex(pd.MultiIndex.from_tuples(searchparams,names=co_search.indexes[unkdim].names),unkdim).to_dataset()[unkdim]
+            else:
+                #okay just turn the values in a DataArray
+                searchparams=xr.DataArray(searchparams,dims=dimname)
         #find unique and overlapping coordinates over the unknown dimension
         notfnd,fnd,remng=find_overlap_coords(searchparams,co_search)
        

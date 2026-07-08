@@ -47,16 +47,17 @@ class InverseDsAccessor:
     def solve(self,inplace=False):
         return neqsolve(self._obj,inplace) #solve the normal equation system
     
-    def reduce(self,keep=False,**kwargs):
-        return reduce(self._obj,keep=keep,**kwargs) #reduce  parameters from the normal equation system
+    def reduce(self,labels=None,keep=False,**kwargs):
+        
+        return reduce(self._obj,labels=labels,keep=keep,**kwargs) #reduce  parameters from the normal equation system
     def ireduce(self,idx,keep=False):
         return ireduce(self._obj,idx=idx,keep=keep) #reduce  parameters by index
     
     def groupreduce(self,groupname,keep=False):
         return groupreduce(self._obj,groupname,keep=keep) #reduce  parameters by groupname index
     
-    def fix(self,keep=False,**kwargs):
-        return fix(self._obj,keep=False,**kwargs) #remove parameters from the normal equation system (fix them to their current apriori values)
+    def fix(self,labels=None,keep=False,**kwargs):
+        return fix(self._obj,labels=labels,keep=False,**kwargs) #remove parameters from the normal equation system (fix them to their current apriori values)
     
     def ifix(self,idx,keep=False):
         """fix by index"""

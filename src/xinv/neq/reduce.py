@@ -115,20 +115,22 @@ def ireduce(dsneq,idx,keep=False):
 
     return o_dsneq
 
-def reduce(dsneq, keep=False,**kwargs):
+def reduce(dsneq,labels=None, keep=False,**kwargs):
     """
         Reduce Normal equation system using coordinate labelling
         Parameters:
         -----------
         dsneq: xarray.Dataset
             Dataset containing the normal equation system to be reduced
+        labels: array like
+            search for these labels to reduce/keep in the default unknown coordinate
         **kwargs: 
             keyword arguments with the dimension name as key and a list of coordinate labels to be reduced from the system
             coord1 = reducelabels1 , .. coord2 = reducelabels2 
 
     """
     
-    idxfound,idxremaining,idxnotfound=find_unk_idx(dsneq,**kwargs)
+    idxfound,idxremaining,idxnotfound=find_unk_idx(dsneq,labels=labels,**kwargs)
     if idxnotfound is not None:
         xinvlogger.warning(f"Reduction parameters contain values {idxnotfound} which are not found in the input normal equation system, ignoring those")
 

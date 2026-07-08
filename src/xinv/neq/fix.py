@@ -44,13 +44,15 @@ def ifix(dsneq,idx,keep=False):
     return o_dsneq
 
 
-def fix(dsneq, keep=False,**kwargs):
+def fix(dsneq, labels=None, keep=False,**kwargs):
     """
         Fix/remove parameters from a Normal equation system using coordinate labelling
         Parameters:
         -----------
         dsneq: xarray.Dataset
             Dataset containing the normal equation system to be fixed
+        labels: array like
+            search for these labels to fix/keep in the default unknown coordinate
         keep: bool, optional
             If True, the parameters are kept instead of fixed. The default is False.
         **kwargs: 
@@ -59,7 +61,7 @@ def fix(dsneq, keep=False,**kwargs):
 
     """
     
-    idxfound,idxremaining,idxnotfound=find_unk_idx(dsneq,**kwargs)
+    idxfound,idxremaining,idxnotfound=find_unk_idx(dsneq,labels=labels,**kwargs)
     if idxnotfound is not None:
         xinvlogger.warning(f"Fix parameters contain values {idxnotfound} which are not found in the input normal equation system, ignoring those")
 

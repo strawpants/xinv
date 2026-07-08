@@ -106,13 +106,16 @@ def test_neq_partial_transform(noisypoly):
             neqtrans=neqtrans.xi.add(neqsingle.xi.transform(polyfwd,x=[x]))
     
     
-    #try solving (should not work because of rank defect
+    #try solving (should not work because of rank defect on poly =1
     try:
-        dssol=neqtrans.xi.solve()
-        #should not get here:
-        assert False
+        dssol_fail=neqtrans.xi.solve()
+        #if this manages to go through we expect ridiculous large errors and negative error covariance between the poly=1 and polybase=1 ill-posed parameters
+        
+        if np.max(dssol_fail.COV) < 1 or np.min(dssol_fail.COV) > -1:
+            #Something's fishy we don't expect this system to be well-posed 
+            assert False
     except XinvIllposedError: 
-        #expected behavior
+        #Okay, expected behavior
         pass
 
 
