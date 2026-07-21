@@ -12,7 +12,7 @@ from xinv.core.attrs import find_xinv_coords,xinv_tp,xinv_st
 
 from fixtures import neqbase
 
-@pytest.mark.parametrize("neqbase",["simple","stacked"],indirect=True)
+@pytest.mark.parametrize("neqbase",["stacked","simple"],indirect=True)
 @pytest.mark.parametrize("auxdim",["allaux","aux_0"])
 def test_addneqs_same(neqbase,auxdim):
     """
@@ -25,14 +25,15 @@ def test_addneqs_same(neqbase,auxdim):
     #add the two normal equation systems (both are the same)
     neqcomb_same=neqbase.xi.add(neqbase2)
    
-    unk_xinvcoords=find_xinv_coords(neqbase,include=[xinv_tp.unk_co],state=xinv_st.linked)
+    
+    #unk_xinvcoords=find_xinv_coords(neqbase,include=[xinv_tp.unk_co],state=xinv_st.linked)
     #Should be one only
-    unk_name=next(iter(unk_xinvcoords.keys()))
+    #unk_name=next(iter(unk_xinvcoords.keys()))
 
+    unk_name,_=neqbase.xi.unknown_dim()
 
     #note combined normal equation system may have a different sorting
-    idx1=find_ilocs(neqcomb_same,unk_name,neqbase.coords[unk_name].data)
-    
+    idx1=neqcomb_same.xi.get_indexer(neqbase)
     #parameters should stay the same as there are no implicitly reduced parameters
     assert np.allclose(neqcomb_same.npara,neqbase.npara)
     #number of observations should be doubled
@@ -57,14 +58,10 @@ def test_addneq_compl(neqbase):
     """ 
     test adding two normal equation systems with a partial overlap of parameters
     """    
-    neqbase2=neqbase.copy(deep=True)
+    neqbase2=neqbase.xi.deepcopy().xi.rename_levels(poly='poly2')
     #modify the second normal equation system so that it has a different set of parameters but with an overlap
-    neqbase2=neqbase2.xi.rename_groups(dict(poly='poly2'))
-
-
     #add the two normal equation systems (both are the same)
     neqcomb=neqbase.xi.add(neqbase2)
-   
     #LtpL should be the sum of the base inputs
     assert np.allclose(neqcomb.ltpl,neqbase.ltpl+neqbase2.ltpl)
     
@@ -77,27 +74,29 @@ def test_addneq_compl(neqbase):
     assert np.allclose(neqcomb.nobs,neqbase.nobs+neqbase2.nobs)
     
     #system 1 subset test
-    neqc_poly=neqcomb.xi.get_group('poly')
-    ixpoly=find_ilocs(neqbase,'poly',neqc_poly.poly.data)
+    neqc_poly=neqcomb.xi.get_level('poly')
+    ixpoly=neqbase.xi.get_indexer(neqc_poly)
     #polynomial coefficient entries should mathc the original ones of the first system
     assert np.allclose(neqbase.N[ixpoly,ixpoly],neqc_poly.N)
     assert np.allclose(neqbase.rhs[{'xinv_unk':ixpoly}],neqc_poly.rhs)
 
     #system 2 subset test
-    neqc_poly=neqcomb.xi.get_group('poly2')
-    ixpoly=find_ilocs(neqbase2,'poly2',neqc_poly.poly.data)
+    neqc_poly=neqcomb.xi.get_level('poly2')
+    ixpoly=neqbase2.xi.get_indexer(neqc_poly)
     #polynomial coefficient entries should mathc the original ones of the first system
     assert np.allclose(neqbase2.N[ixpoly,ixpoly],neqc_poly.N)
     assert np.allclose(neqbase2.rhs[{'xinv_unk':ixpoly}],neqc_poly.rhs)
 
     
     #check overlapping parameters
-    neqc_seas=neqcomb.xi.get_group('harmonics_seasonal')
-    neq1_seas=neqbase.xi.get_group('harmonics_seasonal')
-    neq2_seas=neqbase2.xi.get_group('harmonics_seasonal')
+    neqc_seas=neqcomb.xi.get_level('harmonics_seasonal')
+    neq1_seas=neqbase.xi.get_level('harmonics_seasonal')
+    neq2_seas=neqbase2.xi.get_level('harmonics_seasonal')
 
-    ixseas1=find_ilocs(neq1_seas,'harmonics_seasonal',neqc_seas.harmonics_seasonal.data)
-    ixseas2=find_ilocs(neq2_seas,'harmonics_seasonal',neqc_seas.harmonics_seasonal.data)
+    ixseas1=neq1_seas.xi.get_indexer(neqc_seas)
+    ixseas2=neq2_seas.xi.get_indexer(neqc_seas)
+    #ixseas1=find_ilocs(neq1_seas,'harmonics_seasonal',neqc_seas.harmonics_seasonal.data)
+    #ixseas2=find_ilocs(neq2_seas,'harmonics_seasonal',neqc_seas.harmonics_seasonal.data)
     #Overlap should be the sum of the 2 systems
     assert np.allclose(neqc_seas.N,neq1_seas.N[ixseas1,ixseas1]+neq2_seas.N[ixseas2,ixseas2])
     

@@ -2,7 +2,7 @@
 ## Copyright (c) 2025 Roelof Rietbroek, r.rietbroek@utwente.nl
 
 import xarray as xr
-from xinv.core.attrs import find_component, get_xunk_size_coname,xinv_tp,islower,find_neq_components,unlink,find_xinv_coords,get_type
+from xinv.core.attrs import find_component, get_xunk_size_coname,xinv_tp,islower,find_neq_components,unlink,find_xinv_coords,get_type,xunk_coords_attrs,xinv_st
 from xinv.core.grouping import split_as_groups,get_group,build_group_coord
 from xinv.neq.neq import zeros as neqzeros
 from xinv.core.tools import find_overlap_coords,find_ilocs
@@ -106,13 +106,13 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
         outcoords[i_unkdim]=dsneq[i_unkdim].isel({i_unkdim:idxnotrans})
         unlink(outcoords[i_unkdim])
 
-   #possibly add coordinates from the Jaconian which are associated with a group coordinate
-    
-
+    #possibly add coordinates from the Jacobian which are associated with a group coordinate
+     
     #add auxiliary coordinates from the input rhs
     for k,v in i_rhs.coords.items():
         if k != i_unkdim:
-            if v.dims[0] == i_unkdim:
+            if bool(v.dims) and v.dims[0] == i_unkdim:
+                
                 
                 xinvtype=get_type(v,raiseError=False)
                 if xinvtype is not None and (xinvtype == xinv_tp.grp_id_co or xinvtype == xinv_tp.grp_seq_co):
@@ -139,6 +139,8 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
     
     i_lower=islower(i_N)
     o_dsneq= neqzeros(rhsdims=o_rhsdims,coords=outcoords,lower=i_lower)
+    #xexplicitly link new unknown coordinate (not always carried over from Jacobian)
+    o_dsneq[o_unkdim].attrs.update(xunk_coords_attrs(xinv_st.linked))
     #pointers to the new normal equation system
     o_N,o_rhs,o_x0,o_ltpl,o_sigma0,o_nobs,o_npara=find_neq_components(o_dsneq)
 
@@ -159,7 +161,12 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
         
     #transformed part (valid for both partial and non-partial transforms
     #right hand side
+    
+    #unpack jacobian if it is sparse (todo use sparse triangular routines once they become available)
+    if hasattr(jac.jacobian.data,"todense"):
+        jac.jacobian.data=jac.jacobian.data.todense()
     # add the transformed part of the input rhs to the output rhs (note: inplace operation in o_rhs)
+    
     o_rhs[{o_unkdim:tslice}]=xr.dot(jac.jacobian,i_rhs.isel({i_unkdim:idxtrans}),dim=i_unkdim).data
 
     #transform normal matrix

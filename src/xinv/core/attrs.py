@@ -167,10 +167,9 @@ def find_xinv_coords(dsneq,exclude=None,include=None,state=None):
     return xinvcoords
 
 def find_xinv_unk_coord(dsneq):
-
     xunk_co=find_xinv_coords(dsneq,include=[xinv_tp.unk_co],state=xinv_st.linked)
-    if len(xunk_co)> 1:
-        raise ValueError("Ambiguous linked unknown coordinate found")
+    if len(xunk_co) != 1 :
+        raise ValueError("No or ambiguous linked unknown coordinate found")
     return next(iter(xunk_co.values()))
 
 def find_xinv_group_coords(dsneq):

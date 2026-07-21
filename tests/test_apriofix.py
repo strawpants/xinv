@@ -8,7 +8,7 @@ from xinv import *
 import os
 
 from fixtures import neqbase
-from xinv.core.tools import find_ilocs,find_unk_idx
+from xinv.core.tools import find_ilocs,find_unk_idxv2
 from xinv.core.logging import xinvlogger
 
 @pytest.mark.parametrize("neqbase",["simple","stacked"],indirect=True)
@@ -25,14 +25,13 @@ def test_aprifix(neqbase,keep):
     #get the index vector corresponding to some polynomials to fix (or keep)
 
     fixpolyparam=[1,2]
-    idxfix,idxremain,_=find_unk_idx(dssol,poly=fixpolyparam)
-    unkdim=dssol.xi.unknown_dim()
+    idxfix=find_unk_idxv2(dssol,poly=fixpolyparam,force_boolean=True)
+    unkdim,_=dssol.xi.unknown_dim()
     #set the apriori values of the unknown parameters to that from the overall solution
     if keep:
-        dsneq_apriset=neqbase.xi.set_x0(dssol.solution[{unkdim:idxremain}],inplace=False)
+        dsneq_apriset=neqbase.xi.set_x0(dssol.solution[{unkdim:~idxfix}],inplace=False)
     else:
         dsneq_apriset=neqbase.xi.set_x0(dssol.solution[{unkdim:idxfix}],inplace=False)
-    
     
     dssolapr=dsneq_apriset.xi.solve()
 
@@ -53,7 +52,7 @@ def test_aprifix(neqbase,keep):
     if keep:
         dssolsub=dssol.isel({unkdim:idxfix,unkdim+"_":idxfix})
     else:
-        dssolsub=dssol.isel({unkdim:idxremain,unkdim+"_":idxremain})
+        dssolsub=dssol.isel({unkdim:~idxfix,unkdim+"_":~idxfix})
     soldif=np.abs(dssolfix.solution+dssolfix.x0-dssolsub.solution)
     # stddev=xr.DataArray(np.sqrt(np.diag(dssolfix.COV)),dims=unkdim,coords={unkdim:dssolfix[unkdim]})*dssolfix.sigma0
     
@@ -71,7 +70,6 @@ def test_aprifix_singlerhs(neqbase):
     #only select one single rhs
     neqbase=neqbase.sel(naux='aux_1')
 
-
     
     #compute the overall solution
     dssol=neqbase.xi.solve()
@@ -79,9 +77,9 @@ def test_aprifix_singlerhs(neqbase):
     #get the index vector corresponding to some polynomials to fix (or keep)
 
     fixpolyparam=[1,2]
-    idxfix,idxremain,_=find_unk_idx(dssol,poly=fixpolyparam)
+    idxfix=find_unk_idxv2(dssol,poly=fixpolyparam)
 
-    unkdim=dssol.xi.unknown_dim()
+    unkdim,_=dssol.xi.unknown_dim()
 
     dsneq_apriset=neqbase.xi.set_x0(dssol.solution[{unkdim:idxfix}])
     
@@ -102,7 +100,7 @@ def test_aprifix_singlerhs(neqbase):
     dsneq_aprifix=dsneq_apriset.xi.fix(poly=fixpolyparam)
     
     dssolfix=dsneq_aprifix.xi.solve()
-    dssolsub=dssol.isel({unkdim:idxremain,unkdim+"_":idxremain})
+    dssolsub=dssol.isel({unkdim:~idxfix,unkdim+"_":~idxfix})
     soldif=np.abs(dssolfix.solution+dssolfix.x0-dssolsub.solution)
     # stddev=xr.DataArray(np.sqrt(np.diag(dssolfix.COV)),dims=unkdim,coords={unkdim:dssolfix[unkdim]})*dssolfix.sigma0
     
@@ -119,20 +117,19 @@ def test_groupfix(neqbase,keep):
     
 
     #compute the overall solution
-    idxpoly=neqbase.xinv_grp_id == "poly" 
+    idxpoly=~np.isnan(neqbase.poly.data.astype(float)) 
     
     dssol=neqbase.xi.solve()
     
-    unkdim=dssol.xi.unknown_dim()
+    unkdim,_=dssol.xi.unknown_dim()
     if keep:
         dsneq_apriset=neqbase.xi.set_x0(dssol.solution)
     else:
         dsneq_apriset=neqbase.xi.set_x0(dssol.solution[{unkdim:idxpoly}])
+    neqbase_aprifix=dsneq_apriset.xi.fix_groups('poly',keep=keep)
 
-    neqbase_aprifix=dsneq_apriset.xi.groupfix('poly',keep=keep)
 
-
-    npara=neqbase.sizes['poly']
+    npara=neqbase['poly'].max().item()+1
     
 
 

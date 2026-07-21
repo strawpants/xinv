@@ -4,7 +4,7 @@
 
 from xinv.core.attrs import find_xinv_unk_coord,find_neq_components,islower,xinv_st,get_state,get_type,xinv_tp,find_xinv_group_coords,get_xunk_size_coname
 
-from xinv.core.tools import find_overlap_coords,find_ilocs,find_unk_idx
+from xinv.core.tools import find_overlap_coords,find_ilocs,find_unk_idx,find_unk_idxv2
 import numpy as np
 import xarray as xr
 from xinv.core.logging import xinvlogger
@@ -61,7 +61,7 @@ def ireduce(dsneq,idx,keep=False):
     for k,v in dsneq.coords.items():
         if k == unkdim:
             outcoords[k]=v[idxkeep]
-        elif  get_type(v) in [xinv_tp.grp_id_co,xinv_tp.grp_seq_co]:
+        elif  k in dsneq.get_index(unkdim).names:
 
             #ignore these as they will already be included in the multiIndex unkdim coordinate
             continue
@@ -130,42 +130,39 @@ def reduce(dsneq,labels=None, keep=False,**kwargs):
 
     """
     
-    idxfound,idxremaining,notfound=find_unk_idx(dsneq,labels=labels,**kwargs)
-    if notfound > 0:
-        xinvlogger.warning(f"Reduction parameters contain {notfound} values which are not found in the input normal equation system, ignoring those")
+    idxfound=find_unk_idxv2(dsneq,selargs=labels,**kwargs)
+    return ireduce(dsneq,idx=idxfound,keep=keep)
+  
 
-    if (not keep and idxremaining is None) or (keep and idxfound is None):
-        xinvlogger.warning("Nothing to reduce, returning input")
-        return dsneq
-    elif (not keep and idxfound is None) or (keep and idxremaining is None):
-        #cannot reduce all unknowns
-        raise ValueError("Reduction parameters contain all unknown parameters, cannot reduce all unknowns")
-    
-    return ireduce(dsneq,idxfound,keep)
-
-def groupreduce(dsneq,groupname,keep=False):
+def groupreduce(dsneq,groups=None,keep=False,**kwargs):
     """
     Reduce by groupname a group of parameters from a normal equation system
     Parameters
     ----------
     dsneq : xr.Dataset
         Dataset containing the normal equation system to be reduced
-    groupname : str
-        The groupname of the parameters to be reduced
+    groups : str, or dict
+        The groupname of the parameters to be reduced, or a dictonary with criteria linked to the groupi. Note criteria are applied inclusive so all matches will be considered
     keep : bool, optional
-        If True, the group parameters are kept instead of reduced. The default is False.
+        If True, the found group parameters are kept instead of reduced. The default is False.
+    
     """
+    
+    if groups is not None and len(kwargs) != 0:
+        raise ValueError("Cannot use both **kwargs and group argument at the same time")
+    
+    if len(kwargs) >0:
+        groups=kwargs
+
+    if type(groups) is str:
+        #shortcut when a single groupname is suplied directly
+        return reduce(dsneq,{groups:slice(None)},level_default=None,keep=keep)
 
 
-    #test whether the groupname actually exists
-    grpid_co,grpseq_co=find_xinv_group_coords(dsneq)
-    if grpid_co is None or grpseq_co is None:
-        raise ValueError("No group coordinates found in the normal equation system")
+    for ky,val in groups.items():
+        #append a None to each group before submmitting it to reduce so we make the criteria inclusive all group criteria will be considered
+        valnew=np.empty(len(val)+1,dtype='O')
+        valnew[:-1]=val #noteL this leaves the last alue to None 
+        groups[ky]=valnew
 
-    if groupname not in grpid_co.data:
-        raise ValueError(f"Groupname {groupname} not found in the normal equation system")
-
-    idx=grpid_co.data == groupname
-    return ireduce(dsneq,idx,keep)
-
-
+    return reduce(dsneq,labels=groups,keep=keep)

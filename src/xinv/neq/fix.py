@@ -4,7 +4,7 @@
 
 from xinv.core.attrs import find_component,xinv_tp,find_xinv_group_coords,get_xunk_size_coname
 
-from xinv.core.tools import find_unk_idx
+from xinv.core.tools import find_unk_idx,find_unk_idxv2
 import numpy as np
 from xinv.core.logging import xinvlogger
 
@@ -36,7 +36,7 @@ def ifix(dsneq,idx,keep=False):
         else:
             idxkeep=~np.isin(np.arange(u_sz),idxfix)
 
-    o_dsneq=dsneq.sel({unkdim:idxkeep,unkdim+'_':idxkeep})
+    o_dsneq=dsneq.isel({unkdim:idxkeep,unkdim+'_':idxkeep})
     io_npara=find_component(o_dsneq,xinv_tp.npara)
     #update amount of unknown parameters
     io_npara[()]-=len(idxfix)
@@ -60,41 +60,38 @@ def fix(dsneq, labels=None, keep=False,**kwargs):
             coord1 = fixlabels1 , .. coord2 = fixlabels2 
 
     """
-    idxfound,idxremaining,notfound=find_unk_idx(dsneq,labels=labels,**kwargs)
-    if notfound > 0:
-        xinvlogger.warning(f"Fix parameters contain {notfound} values which are not found in the input normal equation system, ignoring those")
-    if (not keep and idxremaining is None) or (keep and idxfound is None):
-        xinvlogger.warning("Nothing to fix, returning input")
-        return dsneq
-    elif (not keep and idxfound is None) or (keep and idxremaining is None):
-        #cannot fix all unknowns
-        raise ValueError("Fix parameters contain all unknown parameters, cannot fix all unknowns")
-    
+    idxfound=find_unk_idxv2(dsneq,selargs=labels,**kwargs)
     return ifix(dsneq,idx=idxfound,keep=keep)
 
-def groupfix(dsneq,groupname,keep=False):
+def groupfix(dsneq,groups=None,keep=False,**kwargs):
     """
-    Fix/remove by groupname a group of parameters from a normal equation system
+    Fix by groupname a group of parameters from a normal equation system
     Parameters
     ----------
     dsneq : xr.Dataset
-        Dataset containing the normal equation system to be fixed/removed
-    groupname : str
-        The groupname of the parameters to be fixed/removed
+        Dataset containing the normal equation system to be reduced
+    groups : str, or dict
+        The groupname of the parameters to be fixed, or a dictonary with criteria linked to the groupi. Note criteria are applied inclusive so all matches will be considered
     keep : bool, optional
-        If True, the group parameters are kept instead of fixed. The default is False.
+        If True, the found group parameters are kept instead of fixed. The default is False.
+    
     """
+    
+    if groups is not None and len(kwargs) != 0:
+        raise ValueError("Cannot use both **kwargs and group argument at the same time")
+    
+    if len(kwargs) >0:
+        groups=kwargs
+
+    if type(groups) is str:
+        #shortcut when a single groupname is suplied directly
+        return fix(dsneq,{groups:slice(None)},level_default=None,keep=keep)
 
 
-    #test whether the groupname actually exists
-    grpid_co,grpseq_co=find_xinv_group_coords(dsneq)
-    if grpid_co is None or grpseq_co is None:
-        raise ValueError("No group coordinates found in the normal equation system")
+    for ky,val in groups.items():
+        #append a None to each group before submmitting it to reduce so we make the criteria inclusive all group criteria will be considered
+        valnew=np.empty(len(val)+1,dtype='O')
+        valnew[:-1]=val #noteL this leaves the last alue to None 
+        groups[ky]=valnew
 
-    if groupname not in grpid_co.data:
-        raise ValueError(f"Groupname {groupname} not found in the normal equation system")
-
-    idx=grpid_co.data == groupname
-    return ifix(dsneq,idx=idx,keep=keep)
-
-
+    return fix(dsneq,labels=groups,keep=keep)

@@ -4,7 +4,7 @@
 import xarray as xr
 import numpy as np
 from xinv.fwd import FwdOpbase
-from xinv.core.grouping import as_group
+from xinv.core.grouping import as_group,build_group_index
 
 class FwdStackOp(FwdOpbase):
     def __init__(self,fwdops=None,cache=False,unknown_dim="xinv_unk"):
@@ -20,18 +20,29 @@ class FwdStackOp(FwdOpbase):
     def _jacobian_impl(self,**kwargs):
         """Creates the Jacobian of the forward operator"""
         jacobian=None
+        grpcos=[]
         for stack_id,fwdop in enumerate(self._fwdops):
             #get Jacobian and add a multindex holding its stackid
             jacobian_i=fwdop.jacobian(**kwargs)
             #jacobian_i=expand_as_group(jacobian_i,group_dim=fwdop._unkdim,stack_dim=self._unkdim)
-            
-            jacobian_i=as_group(jacobian_i,{fwdop._unkdim:self._unkdim})
+            grpcos.append(jacobian_i[fwdop._unkdim])
+            indx=jacobian_i.get_index(fwdop._unkdim)
+            dropvars=[nm for nm in indx.names]
+            if fwdop._unkdim not in indx.names:
+                #also add top level name from a multindex to the drop list
+                dropvars.append(fwdop._unkdim)
+
+            jacobian_i=jacobian_i.drop_vars(dropvars).rename({fwdop._unkdim:self._unkdim})
+            #jacobian_i=as_group(jacobian_i,{fwdop._unkdim:self._unkdim})
             
             if jacobian is None:
                 jacobian=jacobian_i
             else:
                 #Not really memory friendly at the moment, but ok for now
                 jacobian=xr.concat([jacobian,jacobian_i],dim=self._unkdim)
+        
+        mi=build_group_index(grpcos,name=self._unkdim)
+        jacobian=jacobian.assign_coords({self._unkdim:mi})
         return jacobian
 
     def append(self,fwdop):

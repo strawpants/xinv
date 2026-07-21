@@ -5,17 +5,17 @@ import xarray as xr
 
 from xinv.neq import solve as neqsolve
 from xinv.neq import transform as neqtransform
-from xinv.neq import groupreduce,reduce,ireduce
+from xinv.neq import reduce,ireduce,groupreduce
 from xinv.neq import regadd,regSys
 from xinv.neq import fix,ifix,groupfix
 from xinv.neq import set_x0 as neqset_x0
 from xinv.neq import neqadd
 from xinv.neq import zeros as neqzeros
 from xinv.neq.build import build_normal as neqbuild_normal
+from xinv.core.tools import select,find_ilocs2
+from xinv.core.grouping import get_group,reindex_groups,rename_levels,add_level,serialize_groups,deserialize_groups
 
-from xinv.core.grouping import get_group,reindex_groups,rename_groups,as_group
-
-from xinv.core.attrs import find_xinv_coords,xinv_tp,xinv_st,find_components
+from xinv.core.attrs import find_xinv_coords,xinv_tp,xinv_st,find_components,xunk_coords_attrs
 import numpy as np
 
 @xr.register_dataarray_accessor("xi")
@@ -41,6 +41,21 @@ class InverseDsAccessor:
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
     
+    @property
+    def index(self):
+        """
+        Returns
+        """
+        unkdim,_=self.unknown_dim()
+        return self._obj.get_index(unkdim)
+
+    def sel(self,**kwargs):
+        """
+            Xarray like select but also applied to the transpose dimension of a normal equation system
+
+        """
+        return select(self._obj,**kwargs)
+
     def transform(self,fwdop,**kwargs):
         return neqtransform(self._obj,fwdop,**kwargs) #transform the normal equation system using a forward operator
     
@@ -52,19 +67,19 @@ class InverseDsAccessor:
         return reduce(self._obj,labels=labels,keep=keep,**kwargs) #reduce  parameters from the normal equation system
     def ireduce(self,idx,keep=False):
         return ireduce(self._obj,idx=idx,keep=keep) #reduce  parameters by index
-    
-    def groupreduce(self,groupname,keep=False):
-        return groupreduce(self._obj,groupname,keep=keep) #reduce  parameters by groupname index
+
+    def reduce_groups(self,groups=None,keep=False,**kwargs):
+        return groupreduce(self._obj,groups=groups,keep=keep,**kwargs)
     
     def fix(self,labels=None,keep=False,**kwargs):
-        return fix(self._obj,labels=labels,keep=False,**kwargs) #remove parameters from the normal equation system (fix them to their current apriori values)
+        return fix(self._obj,labels=labels,keep=keep,**kwargs) #remove parameters from the normal equation system (fix them to their current apriori values)
     
     def ifix(self,idx,keep=False):
         """fix by index"""
         return ifix(self._obj,idx=idx,keep=keep) #remove parameters from the normal equation system (fix them to their current apriori values)
     
-    def groupfix(self,groupname,keep=False):
-        return groupfix(self._obj,groupname,keep=keep)
+    def fix_groups(self,groups=None,keep=False,**kwargs):
+        return groupfix(self._obj,groups=groups,keep=keep,**kwargs)
 
     def set_x0(self,dax0,is_delta=False,inplace=False):
         return neqset_x0(self._obj,dax0,is_delta,inplace) #change apriori values
@@ -89,22 +104,49 @@ class InverseDsAccessor:
             return regadd(self._obj,dsreg,alpha=alpha,inplace=inplace)
 
 
-    def as_group(self,arg=None,**kwargs):
+    def add_level(self,arg=None,**kwargs):
         """ 
-        Expand system as group
+        Expand system by adding a new level with a constant value to linked coordinate (Multi)Index
         """
-        return as_group(self._obj,arg,**kwargs)
+        return add_level(self._obj,arg,**kwargs)
 
-    def get_group(self,group_name):
-        return get_group(self._obj,group_name)
+    def get_level(self,level_name):
+        dsout=select(self._obj,**{level_name:None},inverse=True)
+        unkdim,unkdim_=self.unknown_dim()
+        dsout=dsout.reset_index(unkdim).drop_vars([name for name in self.index.names if name != level_name]).rename({unkdim:level_name}).set_xindex(level_name)
+        if unkdim_ is not None:
+            dsout=dsout.rename({unkdim_:level_name+"_"})
+        
+        #reassgin attributes
+        dsout[level_name].attrs.update(xunk_coords_attrs(state=xinv_st.linked))
+        return dsout
+    
+    def get_indexer(self,other):
+        """
+        return an indexer allowing the lookup of the values of other in the source dataset
+        """
+        xunk_co=find_xinv_coords(other,include=[xinv_tp.unk_co],state=xinv_st.linked)
+        if len(xunk_co)!=1:
+            raise ValueError("No or ambiguous linked unknown coordinate found in other")
+        unkdim= next(iter(xunk_co.values())).dims[0]
+        return find_ilocs2(self.index,other.get_index(unkdim))
 
+
+    def serialize_groups(self):
+        return serialize_groups(self._obj)
+    
+    def deserialize_groups(self):
+        return deserialize_groups(self._obj)
+    
+        
     def reindex_groups(self,group_dim=None,assoc_coords=None):
         """
         Reindex/rebuild the group coordinates and multinded in the dataset to match the original coordinates
         """
         return reindex_groups(self._obj,group_dim,assoc_coords)
-    def rename_groups(self,grpmap):
-        return rename_groups(self._obj,grpmap)
+    
+    def rename_levels(self,renamemap=None,**kwargs):
+        return rename_levels(self._obj,renamemap,**kwargs)
 
     @staticmethod
     def neqzeros(rhsdims,coords,lower=0):
@@ -113,7 +155,7 @@ class InverseDsAccessor:
     def unknown_dim(self):
         
         """
-        Convenience function to retrieve the name of the currently linked unknown coordinate dimension
+        Convenience function to retrieve the name of the currently linked unknown coordinate dimension, and its transpose
         
         Returns 
         -------
@@ -123,8 +165,15 @@ class InverseDsAccessor:
         """
         xunk_co=find_xinv_coords(self._obj,include=[xinv_tp.unk_co],state=xinv_st.linked)
         if len(xunk_co)!=1:
+            breakpoint()
             raise ValueError("No or ambiguous linked unknown coordinate found")
-        return next(iter(xunk_co.values())).dims[0]
+        unkdim= next(iter(xunk_co.values())).dims[0]
+        if unkdim+"_" in self._obj.dims:
+            unkdim_=unkdim+"_"
+        else:
+            #return None if no transpose variant was found
+            unkdim_=None
+        return unkdim,unkdim_
 
     def unknown_size(self):
         """

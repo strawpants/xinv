@@ -13,8 +13,8 @@ from xinv.fwd.seaspoly import SeasPoly
 from xinv.core.exceptions import XinvIllposedError
 import os
 
-neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly.nc')
-neqfile_illposed=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_illposed.nc')
+neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpolyv2.nc')
+neqfile_illposed=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_illposedv2.nc')
 
 #note apply a seed to garantee reproducibility (otherwise tests may fail in  statistical sense)
 rg=np.random.default_rng(12789)
@@ -130,7 +130,7 @@ def test_stacked(noisystacked):
     dsneq=noisystacked.obs.xi.build_normal(fwdstck,ecov=std_noise*std_noise)
     if not os.path.exists(neqfile1):
         #write the normal equation system to a file (used for other tests)
-        dsneq.reset_index('xinv_unk').to_netcdf(neqfile1)
+        dsneq.xi.serialize_groups().to_netcdf(neqfile1)
 
     dssol=dsneq.xi.solve()
 

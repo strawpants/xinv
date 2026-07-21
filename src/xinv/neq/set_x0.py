@@ -17,11 +17,10 @@ def set_x0(dsneqin:xr.Dataset, daapri:xr.DataArray, apriori_is_delta=False, inpl
         dsneq=dsneqin.copy(deep=True)
     
     
-    
     #note prefix io_ denotes used for in and output, i_ is used for input only
     i_N,io_rhs,io_x0,io_ltpl,_,_,_=find_neq_components(dsneq)
     
-    unkdim=dsneq.xi.unknown_dim()
+    unkdim,_=dsneq.xi.unknown_dim()
     
     if io_x0 is None:
         #create a new  x0 entry
@@ -47,8 +46,11 @@ def set_x0(dsneqin:xr.Dataset, daapri:xr.DataArray, apriori_is_delta=False, inpl
 
 
     #find the indices of the apriori values in the unknown vector
-    idxapri=find_ilocs(dsneq,unkdim,daapri.coords[unkdim])
-    
+    try:
+        idxapri=find_ilocs(dsneq,unkdim,daapri.coords[unkdim])
+        #idxapri=find_unk_idxv2(dsneq,unkdim,daapri.coords[unkdim])
+    except:
+        breakpoint()
     deltax0=xr.zeros_like(io_rhs.reset_index(unkdim))
     aslc={unkdim:idxapri}
     if apriori_is_delta:

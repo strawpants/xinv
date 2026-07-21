@@ -7,7 +7,7 @@ from xinv.core.attrs import find_xinv_coords,find_neq_components, xunk_coords_at
 
 from xinv.core.logging import xinvlogger
 
-from xinv.core.tools import find_ilocs
+from xinv.core.tools import unique_union,find_ilocs2
 from xinv.core.grouping import find_group_coords,build_group_coord
 
 def neqadd(dsneq:xr.Dataset, dsneqother:xr.Dataset):
@@ -41,31 +41,37 @@ def neqadd(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     
     unkdim1=N1.dims[0]
     unkdim2=N2.dims[0]
-    
-    #find out the unique unknown parameters
+    #find out the unique joint unknown parameters
+    xunk_idx1=N1.get_index(unkdim1)
+    xunk_idx2=N2.get_index(unkdim2)
+    unique_index=unique_union(xunk_idx1,xunk_idx2)
+
     # unique_unk_coord=pd.MultiIndex.from_tuples(np.unique(np.concatenate([N1[unkdim1].data,N2[unkdim2]])))
-    unique_unk_coord=xr.DataArray(np.unique(np.concatenate([N1[unkdim1].data,N2[unkdim2]])),dims=[unkdim1],name=unkdim1)
+    
+    # 17 july 2026 fix unique overlap when only level names differ
+    unique_unk_coord=xr.DataArray(unique_index,dims=[unkdim1],name=unkdim1)
     unique_unk_coord.attrs.update(xunk_coords_attrs(state=xinv_st.linked))
 
     #find the auxiliary dimensions (ignore the unknown parameter dimension, and group_id/and seq)
     
     xinvcoords=find_xinv_coords(dsneq,exclude=[xinv_tp.grp_id_co,xinv_tp.grp_seq_co])
-    group_id_co,group_seq_co,_=find_group_coords(dsneq)
+    #group_id_co,group_seq_co,_=find_group_coords(dsneq)
 
     #check if the group id and sequence coordinates are present in the first system
-    if group_id_co is not None and group_seq_co is not None:
+    #if group_id_co is not None and group_seq_co is not None:
         #turn the unknown coordinate into a multiindex
-        grp_co=build_group_coord(unique_unk_coord,dim=unkdim1,group_id_name=group_id_co.name,group_seq_name=group_seq_co.name)
-        xinvcoords[unkdim1]=grp_co[unkdim1]
-        xinvcoords[group_id_co.name]=grp_co[group_id_co.name]
-        xinvcoords[group_seq_co.name]=grp_co[group_seq_co.name]
-    else:
+    #    grp_co=build_group_coord(unique_unk_coord,dim=unkdim1,group_id_name=group_id_co.name,group_seq_name=group_seq_co.name)
+    #    xinvcoords[unkdim1]=grp_co[unkdim1]
+    #    xinvcoords[group_id_co.name]=grp_co[group_id_co.name]
+    #    xinvcoords[group_seq_co.name]=grp_co[group_seq_co.name]
+    #else:
 
         #replace the unknow coordinate with the union version
-        xinvcoords[unkdim1]=unique_unk_coord
+    #    xinvcoords[unkdim1]=unique_unk_coord
     #add the proper attributes
-
     
+    
+    xinvcoords[unkdim1]=unique_unk_coord
     
     
     xinvcoordsother=find_xinv_coords(dsneqother,exclude=[xinv_tp.grp_id_co,xinv_tp.grp_seq_co])
@@ -87,8 +93,7 @@ def neqadd(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     Nout,rhsout,x0out,ltplout,sigma0out,nobsout,nparaout=find_neq_components(dsneq_merged)
     #Note: we need to be very careful when assigning values to the above views so that we insert data at the existing memory locations (!!), rather than replace the views alltogether
     #add stuff from the first normal equation system
-    
-    idx1=find_ilocs(dsneq_merged,unkdim1,N1[unkdim1].data)
+    idx1=find_ilocs2(unique_index,xunk_idx1)
     Nout[idx1,idx1]=N1.data
     rhsout[{unkdim1:idx1}]=rhs1.data
     
@@ -104,7 +109,7 @@ def neqadd(dsneq:xr.Dataset, dsneqother:xr.Dataset):
 
     
     #add stuff from the second normal equation system
-    idx2=find_ilocs(dsneq_merged,unkdim2,N2[unkdim2].data)
+    idx2=find_ilocs2(unique_index,xunk_idx2)
 
     
     

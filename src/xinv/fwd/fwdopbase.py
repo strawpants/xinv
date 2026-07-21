@@ -58,6 +58,7 @@ class FwdOpbase:
 
         if self._cache_jacobian:
             self._jacob=jacob
+        
         return jacob
 
     def build_normal(self,daobs,ecov=1):
