@@ -104,11 +104,10 @@ def test_sinex(sinexvaldata):
     dsneqsinex=xr.open_dataset(sinexfile,drop_variables=["N"])
     end=time.time()
     xinvlogger.info(f"Time to read sinex file without normal matrix {end-start:.2f} seconds")
-
     if 'COD0OPSFI' in sinexfile:
         #get a subgrpup
         dsneqsinex=dsneqsinex.xi.get_group("stat")
-
+    
     for var in ["sol_est","apri_est","sol_std","rhs"]:
         for midict,val in sinexval[var]:
             assert val == dsneqsinex[var].sel(midict).item()

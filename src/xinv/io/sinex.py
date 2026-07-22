@@ -181,38 +181,59 @@ class SNXVEC(SNXBlock):
             #no need to re-add coordinates, because tghey were already assigned in a prvious call of this function
             return dsout
 
-        #change the state of the current unknown coordinate to unlinked
-        change_state(dsout[snxunkco],xinv_st.unlinked)
-
-
         if len(self._coords) == 1:
             #only one group
             grpid=next(iter(self._coords))
             dsout=dsout.rename({unkdim:grpid})
             unkdim=grpid
-            state=xinv_st.linked
-
+            multi=False
         else:
-            #multiple groups: add coordinates but in an unlinked state
-            state=xinv_st.unlinked
-
+            #multiple groups: add coordinates but don't build multindices
+            multi=True
+        
+        levels=[]
+        levnames=[]
         for grpid,coord in self._coords.items():
 
             if grpid  in ["nm","stat"]:
                 #Modify the coordinateinto a multindex
-                coord=pd.MultiIndex.from_tuples(coord, names=self._coord_multindex_names[grpid])
-                coord=xr.Coordinates.from_pandas_multiindex(coord, grpid)
-                dsout=dsout.assign_coords(coord)
-                dsout[grpid].attrs.update(xunk_coords_attrs(state=state))
+                if not multi:
+                    coord=pd.MultiIndex.from_tuples(coord, names=self._coord_multindex_names[grpid])
+                    coord=xr.Coordinates.from_pandas_multiindex(coord, grpid)
+                    dsout=dsout.assign_coords(coord)
+                    dsout[grpid].attrs.update(xunk_coords_attrs(state=xinv_st.linked))
+                else:
+                    coord.append(None)
+                    levnames.append(grpid)
+                    levels.append(coord)
             else:
-                #generic case
-                dsout=dsout.assign_coords({grpid:(grpid,coord)})
-                dsout[grpid].attrs.update(xunk_coords_attrs(state=state))
+                if not multi:
+                    #generic case
+                    dsout=dsout.assign_coords({grpid:(grpid,coord)})
+                    dsout[grpid].attrs.update(xunk_coords_attrs(state=xinv_st.linked))
+                else:
+                    coord.append(None)
+                    levnames.append(grpid)
+                    levels.append(coord)
         
-        #possibly add group_id and seq coordinates 
-        if state == xinv_st.unlinked:
-            dsout=dsout.assign_coords(build_group_coord(grp_co,dim=unkdim))
+        if multi:
+            #build codes and joined multiindex
+            codes=np.full([len(levels),len(grp_co)],-1)
+            lookup={name:i for i,name in enumerate(levnames)}
+            for i,(grpid,idx) in enumerate(grp_co):
+                codes[lookup[grpid],i]=idx
+            
+            midx=pd.MultiIndex(levels,codes,names=levnames)
+            coord=xr.Coordinates.from_pandas_multiindex(midx, unkdim)
+            dsout=dsout.assign_coords(coord)
+            dsout[unkdim].attrs.update(xunk_coords_attrs(state=xinv_st.linked))
 
+            #possibly add level names which can be use to reconstruct sub-multindexes
+            for ky,names in self._coord_multindex_names.items(): 
+                if names is not None:
+                    tname=ky+"_levels"
+                    dsout[tname]=(tname,names)
+            
         return dsout
 
     def CNparse(self,line):
@@ -479,5 +500,5 @@ def read_sinex(file_or_obj,stopatmat=False):
     if "sigma0" not in dsout:
         dsout["sigma0"]=xr.DataArray(1.0)
         dsout.sigma0.attrs.update(sigma0_attrs())
-
+    dsout=dsout.drop_vars(snxunkco)
     return dsout 
