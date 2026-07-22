@@ -22,7 +22,6 @@ def test_tikhonov(neqbase):
     except XinvIllposedError:
         # failed succesfully
         assert True 
-
     # Create a Tikhonov regularization matrix on a subset of the parameters
     dstik=getTikhonov(poly2=[0])
 
@@ -43,5 +42,5 @@ def test_tikhonov(neqbase):
     #we should now be able to solve the system
     dssolv=neqbasereg.xi.solve()
     # Check if the results make sense (constraint values should be close to zero)
-    assert np.allclose(dssolv.solution.sel(xinv_unk=('poly2',0)),0)
+    assert np.allclose(dssolv.solution.sel(poly2=0),0)
 

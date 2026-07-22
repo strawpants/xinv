@@ -173,33 +173,11 @@ def regadd(dsneq:xr.Dataset,dsreg:xr.Dataset,alpha=None,inplace=False):
     
 
     # find location
-
-    #check for possible conflicts in the subgroups  
-    group_id_co,group_seq_co,group_assoc=find_group_coords(dsneq)
-    if group_id_co is not None and group_seq_co is not None:
-        #check if 
-        r_group_id,r_group_seq,r_asso=find_group_coords(dsreg)
-        if r_group_id is None and r_group_seq is None:
-            dsreg=dsreg.xi.as_group({unkdimreg:unkdim},lookup_co=dsneq)
-            #refind the regularization matrix
-            R=find_component(dsreg,xinv_tp.REG)
-            unkdimreg=R.dims[0]
-        else:
-            #check for consistency in the associated coordinates (if present)
-            for coname,co in r_asso.items():
-                if co is not None and not co.equals(group_assoc[coname]):
-                    raise RuntimeError("Inconsistent associated coordinates between regularization and normal equation")
-    if unkdim != unkdimreg:
-        xinvlogger.warning("Dimensions names do not match, trying anyway")
-    try:
-        idxr=find_ilocs(dsneq,unkdim,R[unkdimreg].data)
-    
-    except KeyError:
-        # extract a subset of the matrix and issue a warning about unused parameters
+    idxr=dsneq.xi.get_indexer(dsreg)
 
 
+    if np.any(idxr == -1):
         raise KeyError("Regularization coordinate contain values not found in the normal equation system")
-
 
 
     # possibly expand sparse regularization matrix (can be improved/specialized when performance requires it)

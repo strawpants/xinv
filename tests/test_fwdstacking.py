@@ -12,9 +12,7 @@ from xinv.fwd.fwdstack import FwdStackOp
 from xinv.fwd.seaspoly import SeasPoly
 from xinv.core.exceptions import XinvIllposedError
 import os
-
-neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpolyv2.nc')
-neqfile_illposed=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_illposedv2.nc')
+from fixtures import neqfile_poly,neqfile_illposed
 
 #note apply a seed to garantee reproducibility (otherwise tests may fail in  statistical sense)
 rg=np.random.default_rng(12789)
@@ -66,7 +64,8 @@ def noisystacked(request):
     return dsobs
 
 
-def test_illposed(noisystacked):
+@pytest.mark.parametrize("lower",[0,1])
+def test_illposed(noisystacked,lower):
     """
     Test a stacked forward operator, consisting of multiple stacked forward operators, building of a normal equation system, and solving step. This setup shoudl results in an illposed system and should be captured as such
     Parameters
@@ -88,7 +87,7 @@ def test_illposed(noisystacked):
 
     # #build the normal equation system
     std_noise=0.5
-    dsneq=noisystacked.obs.xi.build_normal(fwdstck,ecov=std_noise*std_noise) 
+    dsneq=noisystacked.obs.xi.build_normal(fwdstck,ecov=std_noise*std_noise,lower=lower) 
 
     try:
         dssol=dsneq.xi.solve()
@@ -97,10 +96,11 @@ def test_illposed(noisystacked):
     except XinvIllposedError as e:
         #save to test file for later tests
         if not os.path.exists(neqfile_illposed):
-            dsneq.reset_index('xinv_unk').to_netcdf(neqfile_illposed)
+            dsneq.xi.serialize_groups().to_netcdf(neqfile_illposed)
         assert True
         
-def test_stacked(noisystacked):
+@pytest.mark.parametrize("lower",[0,1])
+def test_stacked(noisystacked,lower):
     """
     Test a stacked forward operator, consisting of multiple stacked forward operators, building of a normal equation system, and solving step. 
     Parameters
@@ -127,10 +127,10 @@ def test_stacked(noisystacked):
 
     # #build the normal equation system
     std_noise=0.5
-    dsneq=noisystacked.obs.xi.build_normal(fwdstck,ecov=std_noise*std_noise)
-    if not os.path.exists(neqfile1):
+    dsneq=noisystacked.obs.xi.build_normal(fwdstck,ecov=std_noise*std_noise,lower=lower)
+    if not os.path.exists(neqfile_poly):
         #write the normal equation system to a file (used for other tests)
-        dsneq.xi.serialize_groups().to_netcdf(neqfile1)
+        dsneq.xi.serialize_groups().to_netcdf(neqfile_poly)
 
     dssol=dsneq.xi.solve()
 

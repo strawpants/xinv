@@ -58,7 +58,7 @@ def test_addneq_compl(neqbase):
     """ 
     test adding two normal equation systems with a partial overlap of parameters
     """    
-    neqbase2=neqbase.xi.deepcopy().xi.rename_levels(poly='poly2')
+    neqbase2=neqbase.xi.deepcopy().xi.rename_groups(poly='poly2')
     #modify the second normal equation system so that it has a different set of parameters but with an overlap
     #add the two normal equation systems (both are the same)
     neqcomb=neqbase.xi.add(neqbase2)
@@ -74,14 +74,14 @@ def test_addneq_compl(neqbase):
     assert np.allclose(neqcomb.nobs,neqbase.nobs+neqbase2.nobs)
     
     #system 1 subset test
-    neqc_poly=neqcomb.xi.get_level('poly')
+    neqc_poly=neqcomb.xi.get_group('poly')
     ixpoly=neqbase.xi.get_indexer(neqc_poly)
     #polynomial coefficient entries should mathc the original ones of the first system
     assert np.allclose(neqbase.N[ixpoly,ixpoly],neqc_poly.N)
     assert np.allclose(neqbase.rhs[{'xinv_unk':ixpoly}],neqc_poly.rhs)
 
     #system 2 subset test
-    neqc_poly=neqcomb.xi.get_level('poly2')
+    neqc_poly=neqcomb.xi.get_group('poly2')
     ixpoly=neqbase2.xi.get_indexer(neqc_poly)
     #polynomial coefficient entries should mathc the original ones of the first system
     assert np.allclose(neqbase2.N[ixpoly,ixpoly],neqc_poly.N)
@@ -89,9 +89,9 @@ def test_addneq_compl(neqbase):
 
     
     #check overlapping parameters
-    neqc_seas=neqcomb.xi.get_level('harmonics_seasonal')
-    neq1_seas=neqbase.xi.get_level('harmonics_seasonal')
-    neq2_seas=neqbase2.xi.get_level('harmonics_seasonal')
+    neqc_seas=neqcomb.xi.get_group('harmonics_seasonal')
+    neq1_seas=neqbase.xi.get_group('harmonics_seasonal')
+    neq2_seas=neqbase2.xi.get_group('harmonics_seasonal')
 
     ixseas1=neq1_seas.xi.get_indexer(neqc_seas)
     ixseas2=neq2_seas.xi.get_indexer(neqc_seas)

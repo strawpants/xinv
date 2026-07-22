@@ -3,8 +3,7 @@
 
 import numpy as np
 import xarray as xr
-from xinv.core.attrs import find_neq_components,x0_attrs
-from xinv.core.tools import find_ilocs
+from xinv.core.attrs import find_neq_components,x0_attrs,rhs_attrs
 from xinv.linalg.inplace import dsymm_inplace
 from xinv.core.logging import xinvlogger
 
@@ -34,23 +33,12 @@ def set_x0(dsneqin:xr.Dataset, daapri:xr.DataArray, apriori_is_delta=False, inpl
         #breakpoint() 
         io_rhs.data=io_rhs.data.copy(order='F')
         #link back to output neq
-        dsneq[io_rhs.name]=io_rhs
-        
-        #io_x0.data=io_x0.data.copy(order='F')
-        #dsneq[io_x0.name]=io_x0
-
-        #io_ltpl.data=io_ltpl.data.copy()
-
-    #import ipdb;ipdb.set_trace()
+        dsneq[io_rhs.name]=(io_rhs.dims,io_rhs.data,rhs_attrs())
 
 
 
     #find the indices of the apriori values in the unknown vector
-    try:
-        idxapri=find_ilocs(dsneq,unkdim,daapri.coords[unkdim])
-        #idxapri=find_unk_idxv2(dsneq,unkdim,daapri.coords[unkdim])
-    except:
-        breakpoint()
+    idxapri=dsneq.xi.get_indexer(daapri)
     deltax0=xr.zeros_like(io_rhs.reset_index(unkdim))
     aslc={unkdim:idxapri}
     if apriori_is_delta:

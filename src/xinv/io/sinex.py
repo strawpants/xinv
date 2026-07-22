@@ -8,7 +8,6 @@
 import numpy as np
 import xarray as xr
 from datetime import datetime,timedelta
-from xinv.core.grouping import build_group_coord
 from xinv.core.logging import xinvlogger
 from xinv.io.gzipwrap import gzip_open_r
 from xinv.xiext import  read_symmat_fast

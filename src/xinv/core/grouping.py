@@ -5,7 +5,7 @@ import xarray as xr
 from xinv.core.attrs import find_component, get_xunk_size_coname, group_id_attrs, group_seq_attrs,find_xinv_coords, xunk_coords_attrs,xinv_tp,xinv_st,unlink,is_linked
 import pandas as pd
 from xinv.core.logging import xinvlogger
-from xinv.core.tools import find_ilocs,find_unk_idxv2
+from xinv.core.tools import find_ilocs,find_unk_idxv2,select
 import re
 from warnings import deprecated
 
@@ -13,11 +13,12 @@ def build_group_index(grpcoords,name='xinv_unk'):
     """
         Build a Pandas MultiIndex by using the input coordinates as independent levels, whilst 
     """
-    
+        
     #create levels
     levels=[]
     level_len=[]
     names=[]
+    
     for co in grpcoords:
         levels.append(np.append(co.values,None))
         level_len.append(co.size)
@@ -26,7 +27,6 @@ def build_group_index(grpcoords,name='xinv_unk'):
     co_ln=np.sum(level_len)
     
     codes=np.full([nlev,co_ln],-1)
-    
     #plugin the slices for the appropriate levels
     shft=0
     for i,lev in enumerate(level_len):
@@ -37,8 +37,10 @@ def build_group_index(grpcoords,name='xinv_unk'):
     
 def deserialize_groups(dsneq):
     """
+    
         rebuilds the group based multindex from the levels and data in a serialized dataset
     """
+    
     varnames=[var for var,val in dsneq.data_vars.items()] 
     #also look in the coords
     varnames.extend([var for var,val in dsneq.coords.items()] )
@@ -46,7 +48,10 @@ def deserialize_groups(dsneq):
     #find a potential multilevel variable which needs to be deserialized
     tmp=[name for name in varnames if name.endswith("_mc")]
     if len(tmp) != 1:
-        raise ValueError("No or too many deserialization candidates (ending with '_mc') found")
+        raise ValueError("None or Too many deserialization candidates (ending with '_mc') found")
+
+
+
     unkdim=tmp[0][:-3]
     groupnames=dsneq['group_mn'].data
     ngroups=groupnames.size
@@ -57,25 +62,40 @@ def deserialize_groups(dsneq):
         lnames=[var for var in varnames if re.fullmatch(f'({group}_ml)|({group}_mlt[0-9])',var)]
         if len(lnames) == 1:
             #single coordinate data only
-            levels.append(np.append(dsneq[lnames[0]].data,None))
+            levels.append(dsneq[lnames[0]].data)
+            # levels.append(np.append(dsneq[lnames[0]].data,None))
         else:
             lnames=sorted(lnames) #make sure to sort lexigraphically)
             ntlev=len(lnames)
             args=[dsneq[name].data.tolist() for name in lnames]
-            level=[tp for tp in zip(*args)]
-            level.append(None)
+            level=[None if np.all(np.isin(tp,['',np.nan])) else tp for tp in zip(*args)]
+            # level=[tp for tp in zip(*args)]
+            # level.append(None)
             levels.append(level)
 
     
-    midx=pd.MultiIndex(levels=levels,codes=dsneq[unkdim+"_mc"].data,names=groupnames)
+    midx=xr.Coordinates.from_pandas_multiindex(pd.MultiIndex(levels=levels,codes=dsneq[unkdim+"_mc"].data,names=groupnames),unkdim)
     drop_vars=[var for var in varnames if re.match(r'.*_m[cnl]t?[0-9]?$',var)]
-    dsout=dsneq.drop_vars(drop_vars).assign_coords({unkdim:midx})
+    dsout=dsneq.drop_vars(drop_vars).assign_coords(midx)
     dsout[unkdim].attrs.update(xunk_coords_attrs(state=xinv_st.linked))
     return dsout
 
 def serialize_groups(dsneq):
     """
-        Serialize complicated  (group) multindices so they can be written to e.g. a netcdf file
+        Serialize (nested) multindices associated with the unknown coordinate index so they can be written to a file
+
+    Parameters
+    ----------
+    dsneq : 
+        
+
+    Returns
+    -------
+    
+        
+    
+        
+
     """
     
     unk_dim,_=dsneq.xi.unknown_dim()
@@ -93,11 +113,11 @@ def serialize_groups(dsneq):
             ntlev=len(level[0])
             for i in range(ntlev):
                 s_sername=sername+f"t{i}"
-                dsneq[s_sername]=(sername,[tp[i] for tp in level[0:-1]])
+                # dsneq[s_sername]=(sername,[tp[i] for tp in level[0:-1]])
+                dsneq[s_sername]=(sername,[tp if tp is None else tp[i] for tp in level])
         else:
             # no need to further serialize this
-            #note that we strip off the last None entry
-            dsneq[sername]=(sername,level[0:-1])
+            dsneq[sername]=(sername,level)
     #also add the codes so we can reconstruct the multiindex later
     dsneq[unk_dim+"_mc"]=(["ngroups",unk_dim],midx.codes)
     dsneq["group_mn"]=(["ngroups"],midx.names) 
@@ -109,6 +129,7 @@ def serialize_groups(dsneq):
     
 
 
+@deprecated("You shouldn't be using old group style coordinates in this version anymore")
 def find_group_coords(dsneq,grpdim=None,assoc_coords=None):
     """
     Find the group id and sequence coordinates in a dataset
@@ -166,6 +187,7 @@ def find_group_coords(dsneq,grpdim=None,assoc_coords=None):
         
     return group_id_co,group_seq_co,group_asso_co
 
+@deprecated("You shouldn't be using old group style coordinates in this version anymore")
 def build_group_coord(data,dim='xinv_unk',group_id_name="xinv_grp_id",group_seq_name="xinv_grp_seq"):
    
     if type(data) == xr.DataArray:
@@ -238,36 +260,36 @@ def expand_as_group(dsin,group_dim,group_id_dim="xinv_grp_id",group_seq_dim="xin
         #possibly fix the order of some matrices which may now be transposed ue to the stacking
     return dsout
 
-def add_level(dsin,arg=None,**kwargs):
-    """
-        Expand the index to a multiindex (or add an additional level) with a new groupnamer and value
-    """
-    #extract mapping either from arg or from kwargs arguments
-    if type(arg) is dict and len(arg) == 1:
-        group_name,group_value=next(iter(arg.items()))
-    elif len(kwargs) == 1:
-        group_name,group_value=next(iter(kwargs.items()))
-    else:
-        raise ValueError("No or ambigious group mapping provided. use either named arguments group_name=group_value, or a provide a dictionary with the mapping")
+# def add_level(dsin,arg=None,**kwargs):
+    # """
+        # Expand the index to a multiindex (or add an additional level) with a new groupnamer and value
+    # """
+    # #extract mapping either from arg or from kwargs arguments
+    # if type(arg) is dict and len(arg) == 1:
+        # group_name,group_value=next(iter(arg.items()))
+    # elif len(kwargs) == 1:
+        # group_name,group_value=next(iter(kwargs.items()))
+    # else:
+        # raise ValueError("No or ambigious group mapping provided. use either named arguments group_name=group_value, or a provide a dictionary with the mapping")
 
-    dsout=dsin.copy()
+    # dsout=dsin.copy()
     
-    #get the current unknown index
-    unkdim,_=dsin.xi.unknown_dim()
-    unk_idx=dsin.get_index(unkdim)
+    # #get the current unknown index
+    # unkdim,_=dsin.xi.unknown_dim()
+    # unk_idx=dsin.get_index(unkdim)
 
-    dftmp = unk_idx.to_frame()
+    # dftmp = unk_idx.to_frame()
 
-    # Insert new level at specified location
-    dftmp.insert(0, group_name, group_value)
+    # # Insert new level at specified location
+    # dftmp.insert(0, group_name, group_value)
 
-    # Convert back to MultiIndex
-    dsout=dsout.assign_coords({unkdim:pd.MultiIndex.from_frame(dftmp)})
-    #set attrs
-    dsout[unkdim].attrs.update(xunk_coords_attrs(state="linked"))
-    return dsout
+    # # Convert back to MultiIndex
+    # dsout=dsout.assign_coords({unkdim:pd.MultiIndex.from_frame(dftmp)})
+    # #set attrs
+    # dsout[unkdim].attrs.update(xunk_coords_attrs(state="linked"))
+    # return dsout
 
-def get_group(dsneq,groupname):
+def get_group(dsneq,level_name):
     """
     Retrieve a parameter group from a Dataset which contains a Normal equation system or solution thereof
     Parameters
@@ -282,23 +304,22 @@ def get_group(dsneq,groupname):
         The subset of the input which is valid for the groupname
 
     """
-    
-    idx=find_unk_idxv2(dsneq,{groupname:slice(None)},level_default=None)
+    dsout=select(dsneq,**{level_name:None},inverse=True)
+    newidx=dsout[level_name].data
     unkdim,unkdim_=dsneq.xi.unknown_dim()
-    if unkdim_ is not None:
-        dsout=dsneq[{unkdim:idx,unkdim_:idx}]
-    else:
-        dsout=dsneq[{unkdim:idx}]
-    #sanitize and clean leftovers
-    coidx=dsout.get_index(unkdim)
-    drop_vars=[nm for nm in coidx.names if nm != groupname]
-    dsout=dsout.reset_index(unkdim).drop_vars(drop_vars).set_xindex(groupname)
+    # dsout=dsout.reset_index(unkdim).drop_vars([name for name in self.index.names if name != level_name]).rename({unkdim:level_name}).set_xindex(level_name)
+    dsout=dsout.reset_index(unkdim,drop=True).rename_dims({unkdim:level_name}).assign_coords({level_name:newidx})
 
     if unkdim_ is not None:
-        dsout=dsout.rename({unkdim:groupname,unkdim_:groupname+"_"})
-
-    #reset attributes
-    dsout[groupname].attrs.update(xunk_coords_attrs(state="linked"))
+        dsout=dsout.rename_dims({unkdim_:level_name+"_"})
+    idx=dsout.get_index(level_name)
+    levnamekey=level_name+"_levels"
+    if levnamekey in dsout and type(idx) == pd.Index:
+        #build sub multiindex
+        midx=pd.MultiIndex.from_tuples(idx,names=dsout[levnamekey].data)
+        dsout=dsout.reset_index(level_name,drop=True).drop_vars(levnamekey).assign_coords(xr.Coordinates.from_pandas_multiindex(midx,level_name))
+    #reassgin attributes
+    dsout[level_name].attrs.update(xunk_coords_attrs(state=xinv_st.linked))
     return dsout
 
 @deprecated("reindex_groups uses outdated group coordinate structures")
@@ -360,7 +381,7 @@ def reindex_groups(dsneq,group_dim=None,assoc_coords=None):
     return dsneq
 
 
-def rename_levels(dsneq,grpmap=None,**kwargs):
+def rename_groups(dsneq,grpmap=None,**kwargs):
     if grpmap is not None and len(kwargs) != 0:
         raise ValueError("Either supply a mapping as a dictionary of named arguments according to the levels to be renamed")
     
@@ -369,11 +390,13 @@ def rename_levels(dsneq,grpmap=None,**kwargs):
 
     unkdim,_=dsneq.xi.unknown_dim()
     xinv_idx=dsneq.get_index(unkdim)
-    dsneq=dsneq.assign_coords({unkdim:xinv_idx.set_names(grpmap)})
+    xinv_idx=xinv_idx.set_names(grpmap)
+    dsneq=dsneq.reset_index(unkdim,drop=True).assign_coords(xr.Coordinates.from_pandas_multiindex(xinv_idx,unkdim))
     dsneq[unkdim].attrs.update(xunk_coords_attrs(state=xinv_st.linked))
     return dsneq
 
 
+@deprecated("You shouldn't be using old group style coordinates in this version anymore")
 def split_as_groups(dsneq,group_ids:xr.DataArray,stack_dim=None):
     """
     """

@@ -3,12 +3,11 @@
 
 import xarray as xr
 import numpy as np
-from xinv.core.attrs import find_xinv_coords,find_neq_components, xunk_coords_attrs,xinv_tp,xinv_st
+from xinv.core.attrs import find_xinv_coords,find_neq_components, xunk_coords_attrs,xinv_tp,xinv_st,islower
 
 from xinv.core.logging import xinvlogger
 
 from xinv.core.tools import unique_union,find_ilocs2
-from xinv.core.grouping import find_group_coords,build_group_coord
 
 def neqadd(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     """ merge two normal equation systems"""
@@ -55,19 +54,7 @@ def neqadd(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     #find the auxiliary dimensions (ignore the unknown parameter dimension, and group_id/and seq)
     
     xinvcoords=find_xinv_coords(dsneq,exclude=[xinv_tp.grp_id_co,xinv_tp.grp_seq_co])
-    #group_id_co,group_seq_co,_=find_group_coords(dsneq)
 
-    #check if the group id and sequence coordinates are present in the first system
-    #if group_id_co is not None and group_seq_co is not None:
-        #turn the unknown coordinate into a multiindex
-    #    grp_co=build_group_coord(unique_unk_coord,dim=unkdim1,group_id_name=group_id_co.name,group_seq_name=group_seq_co.name)
-    #    xinvcoords[unkdim1]=grp_co[unkdim1]
-    #    xinvcoords[group_id_co.name]=grp_co[group_id_co.name]
-    #    xinvcoords[group_seq_co.name]=grp_co[group_seq_co.name]
-    #else:
-
-        #replace the unknow coordinate with the union version
-    #    xinvcoords[unkdim1]=unique_unk_coord
     #add the proper attributes
     
     
@@ -78,7 +65,7 @@ def neqadd(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     #possibly update with complementary coordinates from the second system
     xinvcoords.update({ky:coord for ky,coord in xinvcoordsother.items() if ky not in xinvcoords.keys()})
     #allocate space for the combined output normal equation system and use system one as the base template
-    dsneq_merged=xr.Dataset.xi.neqzeros(rhsdims=rhs1.dims,coords=xinvcoords)
+    dsneq_merged=xr.Dataset.xi.neqzeros(rhsdims=rhs1.dims,coords=xinvcoords,lower=islower(N1))
     #for some reason the multindex coordinate attributes do not get properly propagated
     #so make sure they are added
     for key,coord in xinvcoords.items():

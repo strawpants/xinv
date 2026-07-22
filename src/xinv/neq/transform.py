@@ -2,10 +2,9 @@
 ## Copyright (c) 2025 Roelof Rietbroek, r.rietbroek@utwente.nl
 
 import xarray as xr
-from xinv.core.attrs import find_component, get_xunk_size_coname,xinv_tp,islower,find_neq_components,unlink,find_xinv_coords,get_type,xunk_coords_attrs,xinv_st
-from xinv.core.grouping import split_as_groups,get_group,build_group_coord
+from xinv.core.attrs import find_component, get_xunk_size_coname,xinv_tp,islower,find_neq_components,unlink,find_xinv_coords,get_type,xunk_coords_attrs,xinv_st,N_attrs,sigma0_attrs,rhs_attrs,ltpl_attrs,nobs_attrs,npara_attrs
 from xinv.neq.neq import zeros as neqzeros
-from xinv.core.tools import find_overlap_coords,find_ilocs
+from xinv.core.tools import find_overlap,find_ilocs2,unique_union
 from xinv.fwd.matrixfwd import MatrixfwdOp
 import numpy as np
 
@@ -55,7 +54,8 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
     jac=fwdoperator.jacobian(daobs=i_x0,**kwargs)#.reset_index(i_unkdim)
     
     #find unique and overlapping coordinates over the transform dimension
-    jauniq,common,neuniq=find_overlap_coords(jac[i_unkdim],dsneq[i_unkdim])
+    jauniq,common,neuniq=find_overlap(jac.get_index(i_unkdim),dsneq.get_index(i_unkdim))
+    # jauniq,common,neuniq=find_overlap_coords(jac[i_unkdim],dsneq[i_unkdim])
     if len(jauniq) > 0:
         raise ValueError(f"Forward operator has unknown coordinate values {jauniq} which are not found in the input normal equation system {dsneq[i_unkdim]}")
     
@@ -63,7 +63,7 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
 
     jac=jac.reset_index(i_unkdim)
     #index vector of the input to transformed parameters
-    idxtrans=find_ilocs(dsneq,i_unkdim,common)
+    idxtrans=find_ilocs2(dsneq.get_index(i_unkdim),common)
     idxnotrans=None 
     if len(neuniq) == 0:
         partial=False
@@ -74,63 +74,20 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
     else:
         # this is more complex as some parameters will be removed/introduced, but some remain in the new syste
         partial=True
-        o_unkdim='trans_composite'
-        o_trgp_id_dim='trans_grp_id'
-        o_trgp_seq_dim='trans_grp_seq'
+        o_unkdim='xinv_unk'
         o_tdim=fwdoperator.unkdim
-        
-        groups=xr.full_like(dsneq[i_unkdim],i_unkdim,dtype=object)
-        groups[idxtrans]='trans'
-        
-        # i_split_dim=f"{i_unkdim}_split"
-        #divide the input system coordinates in two groups 
 
+        midx=xr.Coordinates.from_pandas_multiindex(unique_union(neuniq,jac.get_index(o_tdim)),o_unkdim)
+        outcoords={o_unkdim:midx}
 
-        # dsneq=split_as_groups(dsneq,groups,stack_dim=i_split_dim)
-        
-        #new output coordinates (put the untransformed parameters first)
-        groupoutco=[(i_unkdim,i) for i in range(len(neuniq))]
-        groupoutco.extend([(o_tdim,i) for i in range(jac.sizes[o_tdim])])
-        outcoords={o_unkdim:build_group_coord(groupoutco,dim=o_unkdim,group_id_name=o_trgp_id_dim,group_seq_name=o_trgp_seq_dim)}
-        #add auxiliary coordinates from input system
-        # for k,v in dsneq.coords.items():
-            # if k not in ['trans',i_split_dim,'xinv_grp_id', 'xinv_grp_seq']:
-                # outcoords[k]=v
-
-        #add output coordinates from transformed system (but make sure to unlink them to the unknown dimension)
-        outcoords[o_tdim]=jac[o_tdim]
-        unlink(outcoords[o_tdim])
-
-        #also add the untransformed coordinates 
-        idxnotrans=find_ilocs(dsneq,i_unkdim,neuniq)
-        outcoords[i_unkdim]=dsneq[i_unkdim].isel({i_unkdim:idxnotrans})
-        unlink(outcoords[i_unkdim])
 
     #possibly add coordinates from the Jacobian which are associated with a group coordinate
      
     #add auxiliary coordinates from the input rhs
     for k,v in i_rhs.coords.items():
-        if k != i_unkdim:
-            if bool(v.dims) and v.dims[0] == i_unkdim:
-                
-                
-                xinvtype=get_type(v,raiseError=False)
-                if xinvtype is not None and (xinvtype == xinv_tp.grp_id_co or xinvtype == xinv_tp.grp_seq_co):
-                #don't add coordinated which  are associated with the group coordinates
-
-                    continue
-                
-                #prevent copying input unknown coordinates
-                v=v.drop_vars([i_unkdim])
-                if idxnotrans is not None:
-                    #Only export the part which refers to the still existent non-transformed part
-                    v=v[idxnotrans]
-            
-            if k in v:
-                v=v.drop_vars[k]
+        if v.dims[0] != i_unkdim:
             outcoords[k]=v
-            #make sure to unlink the coordinates
-            unlink(outcoords[k])
+
     #Allocate the new output normal equations system
     #setup dimensions of the output system
     o_rhsdims=[o_unkdim]
@@ -199,14 +156,12 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
     np.fill_diagonal(U, i_N.data.diagonal()/2)
         
     #resort 
-    # idx=find_ilocs(dsneq,i_unkdim,jac[i_unkdim].data)
-    # U=U[np.ix_(idx,idx)]
     
     # breakpoint()
     if partial:
         #in case of a partial transform we also need get the cross sectional matrix
         # index of parameters to keep and transform
-        idxkeep=find_ilocs(dsneq,i_unkdim,neuniq)
+        idxkeep=find_ilocs2(dsneq.get_index(i_unkdim),neuniq)
         i_Ntu=U[np.ix_(idxtrans,idxkeep)]
 
     U=U[np.ix_(idxtrans,idxtrans)]
@@ -245,11 +200,13 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
 
         #copy apriori values
         o_x0[{o_unkdim:uslice}]=i_x0[{i_unkdim:idxkeep}].data
+        # breakpoint()
 
-        if i_lower:
-            #fill lower cross sectional nromal matrix part
+        if i_lower == 0:
+            #fill upper cross sectional nromal matrix part
             o_N[{o_unkdim:uslice,o_unkdim+"_":tslice}]=i_Ntu.T@jac.jacobian.data
         else:
+            #fill upper cross sectional area of the normal matrix
             o_N[{o_unkdim:tslice,o_unkdim+"_":uslice}]=jac.jacobian.T.data@i_Ntu 
 
 
@@ -263,5 +220,12 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
     #Note we may need to adjust the amount of parameters because some may have been removed or newly introduced
     
     o_npara[()]+=o_unksz-i_unksz 
+    o_N.attrs.update(N_attrs(i_lower))
+    o_rhs.attrs.update(rhs_attrs())
+    o_ltpl.attrs.update(ltpl_attrs('apriori'))
+    o_sigma0.attrs.update(sigma0_attrs('apriori'))
+    o_nobs.attrs.update(nobs_attrs())
+    o_npara.attrs.update(npara_attrs())
+    
     return o_dsneq
 

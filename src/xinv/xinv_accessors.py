@@ -13,8 +13,7 @@ from xinv.neq import neqadd
 from xinv.neq import zeros as neqzeros
 from xinv.neq.build import build_normal as neqbuild_normal
 from xinv.core.tools import select,find_ilocs2
-from xinv.core.grouping import get_group,reindex_groups,rename_levels,add_level,serialize_groups,deserialize_groups
-
+from xinv.core.grouping import get_group,reindex_groups,rename_groups,serialize_groups,deserialize_groups
 from xinv.core.attrs import find_xinv_coords,xinv_tp,xinv_st,find_components,xunk_coords_attrs
 import numpy as np
 
@@ -38,6 +37,8 @@ class InverseDaAccessor:
 
 @xr.register_dataset_accessor("xi")
 class InverseDsAccessor:
+    """
+    """
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
     
@@ -104,22 +105,8 @@ class InverseDsAccessor:
             return regadd(self._obj,dsreg,alpha=alpha,inplace=inplace)
 
 
-    def add_level(self,arg=None,**kwargs):
-        """ 
-        Expand system by adding a new level with a constant value to linked coordinate (Multi)Index
-        """
-        return add_level(self._obj,arg,**kwargs)
-
-    def get_level(self,level_name):
-        dsout=select(self._obj,**{level_name:None},inverse=True)
-        unkdim,unkdim_=self.unknown_dim()
-        dsout=dsout.reset_index(unkdim).drop_vars([name for name in self.index.names if name != level_name]).rename({unkdim:level_name}).set_xindex(level_name)
-        if unkdim_ is not None:
-            dsout=dsout.rename({unkdim_:level_name+"_"})
-        
-        #reassgin attributes
-        dsout[level_name].attrs.update(xunk_coords_attrs(state=xinv_st.linked))
-        return dsout
+    def get_group(self,level_name):
+        return get_group(self._obj,level_name)
     
     def get_indexer(self,other):
         """
@@ -138,15 +125,8 @@ class InverseDsAccessor:
     def deserialize_groups(self):
         return deserialize_groups(self._obj)
     
-        
-    def reindex_groups(self,group_dim=None,assoc_coords=None):
-        """
-        Reindex/rebuild the group coordinates and multinded in the dataset to match the original coordinates
-        """
-        return reindex_groups(self._obj,group_dim,assoc_coords)
-    
-    def rename_levels(self,renamemap=None,**kwargs):
-        return rename_levels(self._obj,renamemap,**kwargs)
+    def rename_groups(self,renamemap=None,**kwargs):
+        return rename_groups(self._obj,renamemap,**kwargs)
 
     @staticmethod
     def neqzeros(rhsdims,coords,lower=0):

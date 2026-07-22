@@ -8,6 +8,7 @@ from xinv.core.logging import xinvlogger
 import pandas as pd
 from warnings import deprecated
 
+@deprecated("Use find_ilocs2 instead")
 def find_ilocs(dsneq,dim,elements,reverse=False):
 
     idxsrc=dsneq.get_index(dim)
@@ -77,6 +78,19 @@ def unique_union(idx1,idx2):
     
     return idxout
 
+def find_overlap(idx1,idx2):
+
+    if idx1.name != idx2.name:
+        raise ValueError("Indexes must have the same name")
+    if idx1.dtype != idx2.dtype:
+        raise ValueError(f"Indexes must have the same types, supplied are coord1: {idx1.dtype},coord2: {idx2.dtype}")
+
+    intersect=idx1.intersection(idx2)
+    uniq1=idx1.difference(idx2)
+    uniq2=idx2.difference(idx1)
+    return uniq1,intersect,uniq2
+
+@deprecated("Use find_overlap instead")
 def find_overlap_coords(coord1,coord2):
     """
         Find the unique and common coordinates between two xarray coordinates
@@ -263,7 +277,7 @@ def select(dsin,**kwargs):
     if unkdim_ is not None:
         dsout=dsin.isel({unkdim:idx_select,unkdim_:idx_select})
     else:
-        dsoutdsin.isel({unkdim:idx_select})
+        dsout=dsin.isel({unkdim:idx_select})
     
     #set attributes
 
