@@ -10,6 +10,11 @@ import xarray as xr
 import os
 import xinv 
 
+neqfile_simple=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_simple.nc')
+
+neqfile_illposed=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_illposedv2.nc')
+neqfile_poly=os.path.join(os.path.dirname(__file__),f'testdata/neqpolyv3.nc')
+
 # we fix the seed for the noise generator below to make it noisy but reproducible
 rg=np.random.default_rng(12789)
 
@@ -50,13 +55,10 @@ def neqbase(request):
     """
     if request.param=='simple':
         #simple normal equation system
-        neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_simple.nc')
-        dsneq=xr.load_dataset(neqfile1)
+        dsneq=xr.load_dataset(neqfile_simple)
     elif request.param == 'ill posed':
-        neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_illposedv2.nc')
-        dsneq=xr.load_dataset(neqfile1).xi.deserialize_groups()
+        dsneq=xr.load_dataset(neqfile_illposed).xi.deserialize_groups()
     else:
-        neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpolyv2.nc')
-        dsneq=xr.load_dataset(neqfile1).xi.deserialize_groups()
+        dsneq=xr.load_dataset(neqfile_poly).xi.deserialize_groups()
     
     return dsneq
