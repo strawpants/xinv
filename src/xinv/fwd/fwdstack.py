@@ -4,7 +4,7 @@
 import xarray as xr
 import numpy as np
 from xinv.fwd import FwdOpbase
-from xinv.core.grouping import as_group,build_group_index
+from xinv.core.grouping import build_group_index
 
 class FwdStackOp(FwdOpbase):
     def __init__(self,fwdops=None,cache=False,unknown_dim="xinv_unk"):
@@ -27,13 +27,9 @@ class FwdStackOp(FwdOpbase):
             #jacobian_i=expand_as_group(jacobian_i,group_dim=fwdop._unkdim,stack_dim=self._unkdim)
             grpcos.append(jacobian_i[fwdop._unkdim])
             indx=jacobian_i.get_index(fwdop._unkdim)
-            dropvars=[nm for nm in indx.names]
-            if fwdop._unkdim not in indx.names:
-                #also add top level name from a multindex to the drop list
-                dropvars.append(fwdop._unkdim)
 
-            jacobian_i=jacobian_i.drop_vars(dropvars).rename({fwdop._unkdim:self._unkdim})
-            #jacobian_i=as_group(jacobian_i,{fwdop._unkdim:self._unkdim})
+            #strip away coordinates/index and rename dimension to prepare for concat operation
+            jacobian_i=jacobian_i.reset_index(fwdop._unkdim,drop=True).rename_dims({fwdop._unkdim:self._unkdim})
             
             if jacobian is None:
                 jacobian=jacobian_i
@@ -42,7 +38,7 @@ class FwdStackOp(FwdOpbase):
                 jacobian=xr.concat([jacobian,jacobian_i],dim=self._unkdim)
         
         mi=build_group_index(grpcos,name=self._unkdim)
-        jacobian=jacobian.assign_coords({self._unkdim:mi})
+        jacobian=jacobian.assign_coords(xr.Coordinates.from_pandas_multiindex(mi,self._unkdim))
         return jacobian
 
     def append(self,fwdop):
