@@ -7,7 +7,7 @@ from xinv.core.attrs import rhs_attrs,N_attrs,ltpl_attrs,sigma0_attrs,nobs_attrs
 
 import xarray as xr
 
-def build_normal(fwdop,daobs,ecov=1,**kwargs):
+def build_normal(fwdop,daobs,ecov=1,lower=0,**kwargs):
     
     if len(daobs.sizes) > 2:
         raise NotImplementedError("Cannot handle multiple auxiliary dimensions at the moment")
@@ -36,7 +36,6 @@ def build_normal(fwdop,daobs,ecov=1,**kwargs):
         sigma0=np.ones(nrhs)*ecov
     
     #create the normal equation system (not only upper triangle filled
-    lower=0
     trans=1
     if dadesign.data.flags['C_CONTIGUOUS'] and dadesign.data.strides[1] == 8:
         pass
