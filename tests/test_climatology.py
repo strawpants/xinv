@@ -16,9 +16,6 @@ import os
 
 
 
-# neqfile1=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly.nc')
-# neqfile_illposed=os.path.join(os.path.dirname(__file__),f'testdata/neqpoly_illposed.nc')
-
 # #note apply a seed to garantee reproducibility (otherwise tests may fail in  statistical sense)
 rg=np.random.default_rng(12789)
 
@@ -82,7 +79,6 @@ def test_climatology(noisystacked):
     noisystacked : xr.Dataset containing the noisy polynomial observations and the true polynomial coefficients
 
     """
-    
     #initialize the first polynomial forward operator
     npoly=noisystacked.attrs['npoly']
     t0=noisystacked.attrs['t0']
@@ -108,7 +104,7 @@ def test_climatology(noisystacked):
         # works as expected continue with fixing the degree 0 polynomial component
         pass
     
-    dsneq=dsneq.xi.fix([('poly',0)])
+    dsneq=dsneq.xi.fix(poly=0)
     dssol=dsneq.xi.solve()
     # #extract the groups of the solution and compare to the true values
     dsolpoly=dssol.xi.get_group('poly')
@@ -157,10 +153,9 @@ def test_climatology_mean0(noisystacked):
     except XinvIllposedError as e:
         # works as expected continue with fixing the degree 0 polynomial component
         pass
-   
+    
     #add a mean constraint
-    constrcoord=dsneq.xinv_unk.loc[dict(xinv_unk=('month',[0,1,2,3,4,5,6,7,8,9,10,11]))]
-    dsmean=getMeanConstraint(constrcoord)
+    dsmean=getMeanConstraint(month=np.arange(1,13))
     dsbasereg=dsneq.xi.reg(dsmean,alpha=1e3)
     dssol=dsbasereg.xi.solve()
     # #extract the groups of the solution and compare to the true values
