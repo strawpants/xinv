@@ -68,7 +68,6 @@ def cholesky_inplace(N:xr.DataArray):
     except np.linalg.LinAlgError as e:
         raise XinvIllposedError(str(e))
     N.attrs.update(Chol_attrs(lower))
-
     return N #same object (will be changed now)
 
 def dpotri_inplace(N:xr.DataArray):
@@ -96,7 +95,7 @@ def dpotri_inplace(N:xr.DataArray):
     if restore:
         #copy data back
         N[()]=Ndat 
-    N.attrs.update(cov_attrs()) 
+    N.attrs.update(cov_attrs(lower)) 
     return N
 
 
@@ -132,8 +131,13 @@ def dtrsm_inplace(Chol:xr.DataArray,rhs:xr.DataArray,trans=0):
         lower=1-lower
         transa=1-transa
         choldat=Chol.data.T
+    elif lower == 1:
+        #no idea why this is needed the dtrsm wrapper seems to do mysterious stuff
+        transa=1-transa
+        choldat=Chol.data
     else:
         choldat=Chol.data
+    
     
     dtrsm(1.0,choldat,rhsdat,side=side,lower=lower,trans_a=transa,overwrite_b=1)
 
