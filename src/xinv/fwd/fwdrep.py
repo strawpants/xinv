@@ -43,11 +43,12 @@ class FwdRepOp(FwdOpbase):
         #create new index vector spanning the new unknown dims
         unkco_prod=pd.MultiIndex.from_product([repcoords[self._obsdim].values,src_unkco.values],names=[self._repdim+"_rep",self._fwdsrc._unkdim])
         
-        coords_adopt={self._obsdim:repcoords,self._unkdim:unkco_prod}
+        coords_adopt={self._obsdim:repcoords}#,self._unkdim:unkco_prod}
         #also adopt unlinked xinv coordinates for bookkeeping purposes
         coords_adopt.update(find_xinv_coords(jac_src,state=xinv_st.unlinked))
 
 
         jacobian=xr.Dataset(dict(jacobian=([self._obsdim,self._unkdim],spmat)),coords=coords_adopt)
+        jacobian=jacobian.assign_coords(xr.Coordinates.from_pandas_multiindex(unkco_prod,self._unkdim))
         return jacobian
 

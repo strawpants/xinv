@@ -8,8 +8,6 @@ import numpy as np
 from xinv import *
 from xinv.fwd.fwdrep import FwdRepOp
 from xinv.fwd.polynomial import Polynomial
-from xinv.core.exceptions import XinvIllposedError
-import os
 from fixtures import neqbase
 
 
@@ -31,14 +29,25 @@ def test_rep(neqbase):
     delta_y=1
     npoly=1
     
-    polyfwd=Polynomial(n=npoly,poly_x='y',x0=y0,delta_x=delta_y,cache=False,unknown_dim='poly2')
+    polyfwd=Polynomial(n=npoly,poly_x='y',x0=y0,delta_x=delta_y,cache=False,unknown_dim='polyy')
     fwdrep=FwdRepOp(polyfwd,rep_dim='poly') 
     
+    dstrans=None
     for y in ydat:
         #transform normal equation 
-        dstrans=neqbase.xi.transform(fwdrep,y=[y])
-        
-        dstrans.xi.fix(keep=True,poly2=1)
+        if dstrans is None:
+            dstrans=neqbase.xi.transform(fwdrep,y=[y])
+        else:
+            dstrans=dstrans.xi.add(neqbase.xi.transform(fwdrep,y=[y]))
 
-        assert False
+    dssol_rep=dstrans.xi.solve()
+    dssol=neqbase.xi.solve()
+    
+    #Since we didn't add any actual variation over y we expect the degree 0 polynomial in y to resolve to the original poly=[0,..] values
+    for ipoly in dssol.poly.data:
+        assert np.allclose(dssol.solution.sel(poly=[ipoly]),dssol_rep.solution.sel(polyy=[0],poly_rep=[ipoly]))
+
+    # since we didn't intriduce any variation as a function of y we expect the trend (polyy=1) to be close to zero)
+    assert np.allclose(dssol_rep.solution.sel(polyy=[1]),0)
+    
 
