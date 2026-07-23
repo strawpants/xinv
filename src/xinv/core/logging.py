@@ -7,6 +7,8 @@
 #
 
 
+import warnings
+from functools import wraps
 import logging
 # xinv wide logger
 xinvlogger=logging.getLogger("xinv")
@@ -44,3 +46,18 @@ def setErrorLevel():
     xinvlogger.setLevel(logging.ERROR)
 
 setInfoLevel()
+
+try:
+    from warnings import deprecated
+except ImportError:
+    #fall back
+    def deprecated(message: str, warning_type=DeprecationWarning):
+        def decorator(func):
+            @wraps(func)  # Preserve func's metadata (name, docstring)
+            def wrapper(*args, **kwargs):
+                warnings.warn(message, warning_type,stacklevel=2)
+                return func(*args, **kwargs)
+            return wrapper
+        return decorator
+
+

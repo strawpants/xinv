@@ -4,9 +4,8 @@
 import numpy as np
 import xarray as xr
 from xinv.core.attrs import find_xinv_unk_coord,get_state,get_type,xinv_tp,xinv_st,xunk_coords_attrs
-from xinv.core.logging import xinvlogger
+from xinv.core.logging import xinvlogger,deprecated
 import pandas as pd
-from warnings import deprecated
 
 @deprecated("Use find_ilocs2 instead")
 def find_ilocs(dsneq,dim,elements,reverse=False):

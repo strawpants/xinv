@@ -4,10 +4,13 @@ import numpy as np
 import xarray as xr
 from xinv.core.attrs import find_component, get_xunk_size_coname, group_id_attrs, group_seq_attrs,find_xinv_coords, xunk_coords_attrs,xinv_tp,xinv_st,unlink,is_linked
 import pandas as pd
-from xinv.core.logging import xinvlogger
+from xinv.core.logging import xinvlogger,deprecated
 from xinv.core.tools import find_ilocs,find_unk_idxv2,select
 import re
-from warnings import deprecated
+
+@deprecated("testing custom deprecation warning")
+def test_depr():
+    print("hi")
 
 def build_group_index(grpcoords,name='xinv_unk'):
     """
