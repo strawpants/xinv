@@ -7,7 +7,7 @@ from xinv.core.attrs import find_xinv_coords,find_neq_components, xunk_coords_at
 
 from xinv.core.logging import xinvlogger
 
-from xinv.core.tools import unique_union,find_ilocs2
+from xinv.core.tools import unique_union,find_ilocs2,make_slice
 
 def neqadd(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     """ merge two normal equation systems"""
@@ -19,6 +19,10 @@ def neqadd(dsneq:xr.Dataset, dsneqother:xr.Dataset):
     
     if N1.name != N2.name or rhs1.name != rhs2.name or ltpl1.name != ltpl2.name or sigma01.name != sigma02.name or nobs1.name != nobs2.name or npara1.name != npara2.name:
         xinvlogger.warning("Normal system variables have inconsistent variable names, using names from the first system")
+    
+    #refuse to add block diagonal systems as these may potentially explode RAM use
+    if N1.attrs['xinv_state'] in [xinv_st.BsymU, xinv_st.BsymL] or N2.attrs['xinv_state'] in [xinv_st.BsymU, xinv_st.BsymL] :
+        raise ValueError("One or both of the systems contains a block diagonal normal matrix, either explicity expand the matrices before adding or use the xi.blockby.add(..) routine")
 
     #check for uniform sigma scaling and raise an error if not
     sigma_ratio=sigma01/sigma02

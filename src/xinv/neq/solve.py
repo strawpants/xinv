@@ -9,7 +9,7 @@ from scipy.linalg.blas import dtrsm
 from scipy.linalg.lapack import dpotri
 from xinv.core.exceptions import XinvIllposedError
 
-from xinv.core.attrs import cov_attrs, solest_attrs,ltpl_attrs,find_neq_components,sigma0_attrs,Chol_attrs,xinv_st,islower
+from xinv.core.attrs import cov_attrs, solest_attrs,ltpl_attrs,find_neq_components,sigma0_attrs,Chol_attrs,xinv_st,islower,cov_attrs
 
 from xinv.linalg.inplace import cholesky_inplace, dpotri_inplace,dtrsm_inplace
 
@@ -68,6 +68,7 @@ def solve(dsneq,inplace=False):
     dsneq['sigma0']=sigma0
     
     dsneq=dsneq.rename(dict(N='COV',rhs='solution'))
+    dsneq['COV'].attrs.update(cov_attrs(islower(dsneq.COV)))
     if inplace:
         return None
     else:

@@ -6,3 +6,4 @@ from .reduce import *
 from .set_x0 import *
 from .fix import *
 from .regularize import regadd,regSys
+from .blockby import BlockBy

@@ -57,8 +57,8 @@ def neqbase(request):
         #simple normal equation system
         dsneq=xr.load_dataset(neqfile_simple)
     elif request.param == 'ill posed':
-        dsneq=xr.load_dataset(neqfile_illposed).xi.deserialize_groups()
+        dsneq=xr.load_dataset(neqfile_illposed).xi.deserialize()
     else:
-        dsneq=xr.load_dataset(neqfile_poly).xi.deserialize_groups()
+        dsneq=xr.load_dataset(neqfile_poly).xi.deserialize()
     
     return dsneq

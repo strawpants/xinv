@@ -7,6 +7,37 @@ from xinv.core.attrs import find_xinv_unk_coord,get_state,get_type,xinv_tp,xinv_
 from xinv.core.logging import xinvlogger,deprecated
 import pandas as pd
 
+def make_slice(idx):
+    """
+        Check if index vector can be turned into a slice 
+        returns slice or None
+    """
+    if len(idx) < 2:
+        #no point and xarray doesn;t like these slices
+        return None
+
+    if idx.dtype == bool:
+        idx=np.arange(len(idx))[idx]
+
+
+    steps=np.unique(np.diff(idx))
+    if len(steps) != 1:
+        #cannot turn this into a slice
+        return None
+    step=steps[0]
+
+    if step < 0:
+        st=idx[-1]
+        nd=idx[0]-1
+        if nd < 0:
+            nd=None
+    else:
+        st=idx[0]
+        nd=idx[-1]+1
+    return slice(st,nd,step)
+    
+
+
 @deprecated("Use find_ilocs2 instead")
 def find_ilocs(dsneq,dim,elements,reverse=False):
 
@@ -52,7 +83,12 @@ def find_ilocs2(idxsrc,elements,inverse=False):
 
     if inverse:
         idx=~pd.RangeIndex(idxsrc.size).isin(idx)
-    
+     
+    #possibly turn into a slice
+    slc=make_slice(idx)
+    if slc is not None:
+        idx=slc
+
     return idx 
 
 
@@ -179,6 +215,7 @@ def find_unk_idxv2(dsneq,selargs=None,sort=True,level_default=slice(None),force_
 
     if force_boolean and idx.dtype != bool:
         idx=pd.RangeIndex(xunk_idx.size).isin(idx)
+
     return idx
 
 @deprecated("This routine will be phased out due to different grouping treatment")
@@ -271,14 +308,16 @@ def select(dsin,**kwargs):
     """
     
     idx_select=find_unk_idxv2(dsin,**kwargs)
-     
+    slc=make_slice(idx_select)
+    if slc is not None:
+        idx_select=slc
     unkdim,unkdim_=dsin.xi.unknown_dim() 
     if unkdim_ is not None:
         dsout=dsin.isel({unkdim:idx_select,unkdim_:idx_select})
     else:
         dsout=dsin.isel({unkdim:idx_select})
     
-    #set attributes
+    #set/correct attributes
 
     dsout[unkdim].attrs.update(xunk_coords_attrs(state=xinv_st.linked))
     

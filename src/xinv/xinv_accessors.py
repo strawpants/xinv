@@ -11,10 +11,13 @@ from xinv.neq import fix,ifix,groupfix
 from xinv.neq import set_x0 as neqset_x0
 from xinv.neq import neqadd
 from xinv.neq import zeros as neqzeros
+from xinv.neq import BlockBy
 from xinv.neq.build import build_normal as neqbuild_normal
 from xinv.core.tools import select,find_ilocs2
-from xinv.core.grouping import get_group,reindex_groups,rename_groups,serialize_groups,deserialize_groups
-from xinv.core.attrs import find_xinv_coords,xinv_tp,xinv_st,find_components,xunk_coords_attrs
+from xinv.core.grouping import get_group,reindex_groups,rename_groups
+
+from xinv.io.serialize import serialize,deserialize
+from xinv.core.attrs import find_xinv_coords,xinv_tp,xinv_st,find_components,xunk_coords_attrs,find_component
 import numpy as np
 
 @xr.register_dataarray_accessor("xi")
@@ -41,7 +44,84 @@ class InverseDsAccessor:
     """
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
+   
+    def find_xinv_type(self,xitype):
+        try:
+            return find_component(self._obj,xitype)
+        except:
+            return None
+
+
+    @property
+    def N(self):
+        """
+          Returns the current normal matrix variable if it exists (None) otherwise
+        """
+        return self.find_xinv_type(xinv_tp.N)
     
+    @property
+    def COV(self):
+        """
+          Returns the current Covariance  matrix variable if it exists (None) otherwise
+        """
+        return self.find_xinv_type(xinv_tp.COV)
+    
+    @property
+    def rhs(self):
+        """
+          Returns the current right hand side variable if it exists (None) otherwise
+        """
+        return self.find_xinv_type(xinv_tp.rhs)
+    
+    @property
+    def x0(self):
+        """
+          Returns the current right hand side variable if it exists (None) otherwise
+        """
+        return self.find_xinv_type(xinv_tp.x0)
+    
+    
+    @property
+    def nobs(self):
+        """
+          Returns the current apriori  variable if it exists (None) otherwise
+        """
+        return self.find_xinv_type(xinv_tp.nobs)
+
+    @property
+    def npara(self):
+        """
+          Returns the current apriori  variable if it exists (None) otherwise
+        """
+        return self.find_xinv_type(xinv_tp.npara)
+    
+    @property
+    def ltpl(self):
+        """
+          Returns the current apriori  variable if it exists (None) otherwise
+        """
+        return self.find_xinv_type(xinv_tp.ltpl)
+
+    @property
+    def sigma0(self):
+        """
+          Returns the current apriori  variable if it exists (None) otherwise
+        """
+        return self.find_xinv_type(xinv_tp.sigma0)
+
+    
+    @property
+    def unk_co(self):
+        """
+          Returns the current i unknown coordinate variable
+        """
+        xunk_co=find_xinv_coords(self._obj,include=[xinv_tp.unk_co],state=xinv_st.linked)
+        if len(xunk_co)!=1:
+            raise ValueError("No or ambiguous linked unknown coordinate found")
+        
+        return next(iter(xunk_co.values()))
+
+
     @property
     def index(self):
         """
@@ -119,11 +199,11 @@ class InverseDsAccessor:
         return find_ilocs2(self.index,other.get_index(unkdim))
 
 
-    def serialize_groups(self):
-        return serialize_groups(self._obj)
+    def serialize(self):
+        return serialize(self._obj)
     
-    def deserialize_groups(self):
-        return deserialize_groups(self._obj)
+    def deserialize(self):
+        return deserialize(self._obj)
     
     def rename_groups(self,renamemap=None,**kwargs):
         return rename_groups(self._obj,renamemap,**kwargs)
@@ -206,6 +286,9 @@ class InverseDsAccessor:
             trc*=scale
 
         return trc 
+    
+    def blockby(self,level_name):
+        return BlockBy(self._obj,level_name)
 
     def deepcopy(self,order='F'):
         """

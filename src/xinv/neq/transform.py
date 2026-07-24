@@ -51,7 +51,8 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
     if i_x0 is None:
         i_x0=xr.zeros_like(i_rhs)
 
-    jac=fwdoperator.jacobian(daobs=i_x0,**kwargs)#.reset_index(i_unkdim)
+    #jac=fwdoperator.jacobian(daobs=i_x0,**kwargs)#.reset_index(i_unkdim)
+    jac=fwdoperator.jacobian(daobs=dsneq,**kwargs)#.reset_index(i_unkdim)
     
     #find unique and overlapping coordinates over the transform dimension
     jauniq,common,neuniq=find_overlap(jac.get_index(i_unkdim),dsneq.get_index(i_unkdim))
@@ -85,7 +86,7 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
      
     #add auxiliary coordinates from the input rhs
     for k,v in i_rhs.coords.items():
-        if v.dims[0] != i_unkdim:
+        if not bool(v.dims) or (v.dims[0] != i_unkdim):
             outcoords[k]=v
 
     #Allocate the new output normal equations system
@@ -157,14 +158,24 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
         
     #resort 
     
-    # breakpoint()
     if partial:
         #in case of a partial transform we also need get the cross sectional matrix
         # index of parameters to keep and transform
         idxkeep=find_ilocs2(dsneq.get_index(i_unkdim),neuniq)
-        i_Ntu=U[np.ix_(idxtrans,idxkeep)]
+        if type(idxtrans) == slice and type(idxkeep) == slice:
+            i_Ntu=U[idxtrans,idxkeep]
+        elif type(idxtrans) == slice:
+            
+            i_Ntu=U[np.ix_(np.arange(idxtrans.start,idxtrans.stop+1,idxtrans.step),idxkeep)]
+        elif type(idxkeep) == slice:
+            i_Ntu=U[np.ix_(idxtrans,np.arange(idxkeep.start,idxkeep.stop+1,idxkeep.step))]
+        else:
+            i_Ntu=U[np.ix_(idxtrans,idxkeep)]
 
-    U=U[np.ix_(idxtrans,idxtrans)]
+    if type(idxtrans) == slice:
+        U=U[idxtrans,idxtrans]
+    else:
+        U=U[np.ix_(idxtrans,idxtrans)]
         
     # retrieve X by a triangular matrix multiplication
     # subroutine dtrmm 	( 	character 	side,
@@ -193,7 +204,10 @@ def transform(dsneq:xr.Dataset,fwdoperator,apriori_strategy="ignore",**kwargs):
 
         
         #copy the untransformed part of the input normal matrix
-        o_N[{o_unkdim:uslice,o_unkdim+'_':uslice}]=i_N.data[np.ix_(idxkeep,idxkeep)]
+        if type(idxkeep) == slice:
+            o_N[{o_unkdim:uslice,o_unkdim+'_':uslice}]=i_N.data[idxkeep,idxkeep]
+        else:
+            o_N[{o_unkdim:uslice,o_unkdim+'_':uslice}]=i_N.data[np.ix_(idxkeep,idxkeep)]
         
         #copy right hand side
         o_rhs[{o_unkdim:uslice}]=i_rhs[{i_unkdim:idxkeep}].data

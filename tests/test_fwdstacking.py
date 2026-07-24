@@ -96,7 +96,7 @@ def test_illposed(noisystacked,lower):
     except XinvIllposedError as e:
         #save to test file for later tests
         if not os.path.exists(neqfile_illposed):
-            dsneq.xi.serialize_groups().to_netcdf(neqfile_illposed)
+            dsneq.xi.serialize().to_netcdf(neqfile_illposed)
         assert True
         
 @pytest.mark.parametrize("lower",[0,1])
@@ -130,7 +130,7 @@ def test_stacked(noisystacked,lower):
     dsneq=noisystacked.obs.xi.build_normal(fwdstck,ecov=std_noise*std_noise,lower=lower)
     if not os.path.exists(neqfile_poly):
         #write the normal equation system to a file (used for other tests)
-        dsneq.xi.serialize_groups().to_netcdf(neqfile_poly)
+        dsneq.xi.serialize().to_netcdf(neqfile_poly)
 
     dssol=dsneq.xi.solve()
 

@@ -12,8 +12,8 @@ _xinvtype=namedtuple("_xinvtype","unk_co aux_co grp_id_co grp_seq_co N COV REG r
 xinv_tp=_xinvtype("unk_coord","aux_coord","group_id_coord","group_seq_coord","N","COV","REG", "rhs","solest","solest_std","aprioriVec","ltPl","sigma0","alpha","nobs","npara")
 
 
-_xinvstate=namedtuple("_xinvstate","linked unlinked init apri post symU symL cholU cholL")
-xinv_st=_xinvstate("linked","unlinked","initial","apriori","posteriori","SymUpper","SymLower","CholeskyUpper","CholeskyLower")
+_xinvstate=namedtuple("_xinvstate","linked unlinked init apri post symU symL cholU cholL BsymU BsymL")
+xinv_st=_xinvstate("linked","unlinked","initial","apriori","posteriori","SymUpper","SymLower","CholeskyUpper","CholeskyLower",'BlockSymUpper','BlockSymLower')
 
 
 def xinv_attrs(xitype,xistate,xidescr):
@@ -65,12 +65,12 @@ def cov_attrs(lower=0):
 def islower(mat):
     """Determine if the xinv_type_str is a lower triangular matrix"""
     state=mat.attrs['xinv_state']
-    if state == xinv_st.symL or state == xinv_st.cholL :
+    if state in [xinv_st.symL,xinv_st.cholL,xinv_st.BsymL] :
         return 1
-    elif state == xinv_st.symU or state == xinv_st.cholU :
+    elif state in [xinv_st.symU,xinv_st.cholU,xinv_st.BsymU] :
         return 0
     else:
-        raise ValueError(f"Unknown xinv state: {state}. Must be one of {xinv_st.symL}, {xinv_st.symU}, {xinv_st.cholL}, {xinv_st.cholU}")
+        raise ValueError(f"Unknown xinv state: {state}. Must be one of {xinv_st.symL}, {xinv_st.symU}, {xinv_st.cholL}, {xinv_st.cholU}, {xinv_st.BsymU}, {xinv_st.BsymL}")
 
 def ltpl_attrs(state=xinv_st.apri):
     return xinv_attrs(xinv_tp.ltpl,state,"Least squares cost function values")
